@@ -269,7 +269,7 @@ describe('Expenses e2e', () => {
             method: 'PATCH',
             url: `/expenses/${expenseId}`,
             headers: { Authorization: `Bearer ${accessToken}` },
-            payload: { description: 'Descrição Atualizada' },
+            payload: { description: 'Descrição Atualizada', version: 0 },
         })
 
         expect(res.statusCode).toBe(200)
@@ -326,7 +326,7 @@ describe('Expenses e2e', () => {
             method: 'PATCH',
             url: `/expenses/${expenseId}`,
             headers: { Authorization: `Bearer ${accessToken}` },
-            payload: { description: 'Perde a corrida' },
+            payload: { description: 'Perde a corrida', version: 0 },
         })
 
         stores.forceUpdateConflict = false
@@ -385,7 +385,7 @@ describe('Expenses e2e', () => {
                 method: 'PATCH',
                 url: `/expenses/${createRes.json().expense.id}`,
                 headers: { Authorization: `Bearer ${accessToken}` },
-                payload: { category: 'Lazer' },
+                payload: { category: 'Lazer', version: 0 },
             })
 
             expect(res.statusCode).toBe(200)

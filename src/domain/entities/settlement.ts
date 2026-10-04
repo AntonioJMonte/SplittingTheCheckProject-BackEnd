@@ -18,6 +18,8 @@ export class Settlement {
         confirmedAt?: Date,
         public readonly pixCopyPaste?: string,
         public readonly version: number = 0,
+        // D-89: quando o devedor registrou o pagamento — é a data que o credor vê na lista.
+        public readonly createdAt: Date = new Date(),
     ) {
         this._status = status
         this._confirmedAt = confirmedAt

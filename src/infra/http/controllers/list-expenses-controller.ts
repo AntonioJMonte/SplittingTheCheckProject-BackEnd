@@ -51,6 +51,7 @@ export async function listExpenses(
                 memberId: s.memberId,
                 amount: s.amount.toString(),
             })),
+            version: e.version,
         })),
         total,
     })

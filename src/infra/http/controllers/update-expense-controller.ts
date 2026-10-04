@@ -31,6 +31,7 @@ export async function updateExpense(
     const { expense, pendingCategorization } = await useCase.execute({
         expenseId,
         requestUserId: request.user.sub,
+        version: body.version,
         description: body.description,
         amount: body.amount !== undefined ? String(body.amount) : undefined,
         splitMethod: body.splitMethod,
@@ -52,6 +53,7 @@ export async function updateExpense(
             memberId: s.memberId,
             amount: s.amount.toString(),
         })),
+        version: expense.version,
     }
 
     await invalidateGroupBalancesCache(expense.groupId)

@@ -1,6 +1,26 @@
 import z from 'zod'
 import { badRequest, conflict, notFound, unauthorized } from './shared.schema'
 
+const userProfileShape = z.object({
+    id: z.uuid(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().nullable().describe('E.164; null quando não cadastrado'),
+    pixKey: z.string().nullable(),
+})
+
+export const getUserProfileRouteSchema = {
+    summary: 'Dados do usuário autenticado',
+    description: 'Devolve o perfil de quem está logado. O access token só carrega o id, então o frontend usa esta rota para mostrar nome, email, telefone e chave Pix após um reload.',
+    tags: ['Users'],
+    security: [{ bearerAuth: [] }],
+    response: {
+        200: z.object({ user: userProfileShape }).describe('Perfil do usuário'),
+        401: unauthorized,
+        404: notFound,
+    },
+}
+
 export const updatePixKeyBody = z.object({
     pixKey: z.string().min(1).nullable().optional().describe('Chave Pix em qualquer formato aceito pelo banco; null remove'),
 }).meta({

@@ -14,6 +14,7 @@ function toSettlement(row: {
     confirmedAt: Date | null
     pixCopyPaste: string | null
     version: number
+    createdAt: Date
 }): Settlement {
     return new Settlement(
         row.id,
@@ -25,6 +26,7 @@ function toSettlement(row: {
         row.confirmedAt ?? undefined,
         row.pixCopyPaste ?? undefined,
         row.version,
+        row.createdAt,
     )
 }
 
@@ -52,6 +54,7 @@ export class PrismaSettlementRepository implements SettlementRepository {
                     status: settlement.status,
                     pixCopyPaste: settlement.pixCopyPaste,
                     version: settlement.version,
+                    createdAt: settlement.createdAt,
                     pendingKey: pendingKeyFor(settlement),
                 },
             })
@@ -66,6 +69,14 @@ export class PrismaSettlementRepository implements SettlementRepository {
         const row = await prisma.settlement.findUnique({ where: { id } })
         if (!row) return null
         return toSettlement(row)
+    }
+
+    async findByGroup(groupId: string, status?: SettlementStatus): Promise<Settlement[]> {
+        const rows = await prisma.settlement.findMany({
+            where: { groupId, ...(status ? { status } : {}) },
+            orderBy: { createdAt: 'desc' },
+        })
+        return rows.map(toSettlement)
     }
 
     async findPendingBetweenMembers(fromMemberId: string, toMemberId: string): Promise<Settlement | null> {

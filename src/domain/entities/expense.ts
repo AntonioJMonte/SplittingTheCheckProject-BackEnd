@@ -115,6 +115,23 @@ export class Expense {
         )
     }
 
+    // D-92: o repositório incrementa a versão ao gravar; isto devolve a despesa como ficou salva,
+    // para o cliente mandar a versão nova na próxima edição.
+    withVersion(version: number): Expense {
+        return new Expense(
+            this.id,
+            this.groupId,
+            this.payerId,
+            this.description,
+            this.amount,
+            this.shares,
+            this.splitMethod,
+            this.occurredAt,
+            this.category,
+            version,
+        )
+    }
+
     withCategory(category: ExpenseCategory | undefined): Expense {
         return new Expense(
             this.id,

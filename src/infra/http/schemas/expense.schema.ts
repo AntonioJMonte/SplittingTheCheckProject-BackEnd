@@ -37,8 +37,9 @@ export const updateExpenseBody = z.object({
     splitMethod: z.enum(['EQUAL', 'FIXED', 'PERCENTAGE']).optional(),
     shares: z.array(shareInput).min(1).optional(),
     category: expenseCategory.optional(),
+    version: z.number().int().min(0).describe('Campo `version` da despesa como o cliente a leu. Se outra edição gravou antes, responde 409 e o cliente precisa recarregar'),
 }).meta({
-    example: { description: 'Jantar no restaurante japonês', amount: 210 },
+    example: { description: 'Jantar no restaurante japonês', amount: 210, version: 0 },
 })
 
 export const expenseIdParam = z.object({
@@ -74,6 +75,8 @@ const expenseShape = z.object({
     occurredAt: z.date(),
     category: expenseCategory.optional(),
     shares: z.array(expenseShareShape),
+    // D-92: presente na listagem e na resposta do PATCH, que é o que o cliente usa para editar.
+    version: z.number().int().optional().describe('Enviar de volta no PATCH; muda a cada edição'),
 })
 
 export const createExpenseRouteSchema = {
@@ -113,7 +116,7 @@ export const listExpensesRouteSchema = {
 
 export const updateExpenseRouteSchema = {
     summary: 'Atualizar despesa',
-    description: 'Edita descrição, valor, divisão ou categoria de uma despesa. Apenas o pagador ou OWNER podem editar. Mudar a descrição sem enviar `category` recategoriza automaticamente. Usa lock otimista: responde 409 se a despesa foi alterada entre a leitura e a escrita, e cada edição bem-sucedida guarda o estado anterior como revisão.',
+    description: 'Edita descrição, valor, divisão ou categoria de uma despesa. Apenas o pagador ou OWNER podem editar. Mudar a descrição sem enviar `category` recategoriza automaticamente. Exige a `version` que o cliente leu: se outra edição gravou antes (inclusive enquanto a tela estava aberta), responde 409. A resposta traz a versão nova. Cada edição bem-sucedida guarda o estado anterior como revisão.',
     tags: ['Expenses'],
     security: [{ bearerAuth: [] }],
     params: expenseIdParam,
@@ -151,6 +154,36 @@ export const deleteExpenseRouteSchema = {
     params: expenseIdParam,
     response: {
         204: z.null().describe('Despesa excluída'),
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+    },
+}
+
+const expenseRevisionShape = z.object({
+    version: z.number().int().describe('Versão que este snapshot representa — o estado antes da edição seguinte'),
+    description: z.string(),
+    amount: z.string(),
+    splitMethod: z.enum(['EQUAL', 'FIXED', 'PERCENTAGE']),
+    category: expenseCategory.optional(),
+    occurredAt: z.date(),
+    shares: z.array(z.object({ memberId: z.uuid(), amount: z.string() })),
+    editedBy: z.object({
+        userId: z.uuid(),
+        name: z.string().nullable().describe('Nome atual de quem editou, mesmo que já tenha saído do grupo'),
+    }),
+    editedAt: z.date(),
+})
+
+export const getExpenseRevisionsRouteSchema = {
+    summary: 'Histórico de edições da despesa',
+    description: 'Cada item é o estado da despesa ANTES de uma edição, com quem editou e quando, da mais recente para a mais antiga. Qualquer membro do grupo pode consultar. Despesa excluída responde 404.',
+    tags: ['Expenses'],
+    security: [{ bearerAuth: [] }],
+    params: expenseIdParam,
+    response: {
+        200: z.object({ revisions: z.array(expenseRevisionShape) }).describe('Revisões da despesa'),
         400: badRequest,
         401: unauthorized,
         403: forbidden,

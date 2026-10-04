@@ -9,6 +9,15 @@ body:
   content: |-
     {
       "description": "Pizza Hut — jantar",
-      "amount": 95.50
+      "amount": 95.50,
+      "version": 0
     }
+scripts:
+  - type: afterResponse
+    code: |-
+      // D-92: a resposta traz a versão gravada; a próxima edição precisa mandar esta.
+      const body = pm.response.json()
+      if (body.expense) console.log('próxima edição: "version":', body.expense.version)
+      if (pm.response.code === 409) console.log('versão desatualizada: liste as despesas de novo')
+    language: text/javascript
 order: 3000

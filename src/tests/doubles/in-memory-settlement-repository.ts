@@ -20,6 +20,7 @@ function snapshot(settlement: Settlement, changes: SnapshotChanges = {}): Settle
         changes.confirmedAt ?? settlement.confirmedAt,
         settlement.pixCopyPaste,
         changes.version ?? settlement.version,
+        settlement.createdAt,
     )
 }
 
@@ -39,6 +40,13 @@ export class InMemorySettlementRepository implements SettlementRepository {
     async findById(id: string): Promise<Settlement | null> {
         const found = this.items.find(s => s.id === id)
         return found ? snapshot(found) : null
+    }
+
+    async findByGroup(groupId: string, status?: SettlementStatus): Promise<Settlement[]> {
+        return this.items
+            .filter(s => s.groupId === groupId && (status === undefined || s.status === status))
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            .map(s => snapshot(s))
     }
 
     async findPendingBetweenMembers(fromMemberId: string, toMemberId: string): Promise<Settlement | null> {

@@ -17,6 +17,7 @@ import { createExpense } from '../controllers/create-expense-controller'
 import { listExpenses } from '../controllers/list-expenses-controller'
 import { computeSettlements } from '../controllers/compute-settlements-controller'
 import { confirmSettlement } from '../controllers/confirm-settlement-controller'
+import { listSettlements } from '../controllers/list-settlements-controller'
 import {
     createGroupRouteSchema,
     listGroupsRouteSchema,
@@ -33,7 +34,7 @@ import {
     updateMemberRoleRouteSchema,
 } from '../schemas/member.schema'
 import { createExpenseRouteSchema, listExpensesRouteSchema } from '../schemas/expense.schema'
-import { computeSettlementsRouteSchema, confirmSettlementRouteSchema } from '../schemas/settlement.schema'
+import { computeSettlementsRouteSchema, confirmSettlementRouteSchema, listSettlementsRouteSchema } from '../schemas/settlement.schema'
 
 export async function groupRoutes(fastify: FastifyInstance) {
     const app = fastify.withTypeProvider<ZodTypeProvider>()
@@ -59,4 +60,5 @@ export async function groupRoutes(fastify: FastifyInstance) {
 
     app.get('/groups/:groupId/settlements/compute', { schema: computeSettlementsRouteSchema, preHandler: [verifyMembership] }, computeSettlements)
     app.post('/groups/:groupId/settlements', { schema: confirmSettlementRouteSchema, preHandler: [verifyMembership] }, confirmSettlement)
+    app.get('/groups/:groupId/settlements', { schema: listSettlementsRouteSchema, preHandler: [verifyMembership] }, listSettlements)
 }

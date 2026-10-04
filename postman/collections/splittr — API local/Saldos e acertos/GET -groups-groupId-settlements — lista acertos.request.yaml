@@ -1,0 +1,18 @@
+$kind: http-request
+name: GET /groups/:groupId/settlements — lista acertos
+url: "{{baseUrl}}/groups/{{groupId}}/settlements?status=PENDING"
+method: GET
+queryParams:
+  status: PENDING
+scripts:
+  - type: afterResponse
+    code: |-
+      // D-89: guarda o acerto pendente mais recente para o PATCH .../acknowledge.
+      const body = pm.response.json()
+      const pending = (body.settlements || []).find(s => s.status === 'PENDING')
+      if (pending) {
+        pm.collectionVariables.set('settlementId', pending.id)
+        console.log('settlementId salvo:', pending.id)
+      }
+    language: text/javascript
+order: 3500

@@ -4,9 +4,11 @@ export const errorBody = z.object({
     message: z.string(),
 })
 
+// D-90: `issues` vem em todo erro de validação, com o caminho pontuado do campo ("shares.0.amount").
+// Fica opcional porque o mesmo 400 cobre regra de domínio, que não tem campo.
 export const validationErrorBody = z.object({
     message: z.string(),
-    issues: z.array(z.any()).optional(),
+    issues: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
 })
 
 // Respostas de erro reaproveitadas por todas as rotas. O .describe() vira a `description` da

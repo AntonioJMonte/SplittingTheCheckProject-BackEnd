@@ -1,7 +1,14 @@
 import Decimal from 'decimal.js'
-import { ExpenseRepository, FindManyByGroupParams, FindManyByGroupResult } from '../../application/repositories/expense-repository'
+import {
+    ExpenseRepository,
+    ExpenseRevisionRecord,
+    FindManyByGroupParams,
+    FindManyByGroupResult,
+} from '../../application/repositories/expense-repository'
 import { Expense } from '../../domain/entities/expense'
 import { Settlement } from '../../domain/entities/settlement'
+import { Money } from '../../domain/value-objects/money'
+import { SplitMethodType } from '../../domain/value-objects/split-method'
 import { ExpenseCategory } from '../../domain/value-objects/expense-category'
 
 export class InMemoryExpenseRepository implements ExpenseRepository {
@@ -106,6 +113,7 @@ export class InMemoryExpenseRepository implements ExpenseRepository {
                 amount: share.amount.toString(),
             })),
             editedBy: editedByUserId,
+            editedAt: new Date(),
         })
 
         this.items[index] = new Expense(
@@ -129,6 +137,26 @@ export class InMemoryExpenseRepository implements ExpenseRepository {
 
         this.items[index] = this.items[index].withCategory(category)
         return true
+    }
+
+    async findRevisions(expenseId: string): Promise<ExpenseRevisionRecord[]> {
+        return this.revisions
+            .filter(r => r.expenseId === expenseId)
+            .sort((a, b) => (b.version as number) - (a.version as number))
+            .map(r => ({
+                version: r.version as number,
+                description: r.description as string,
+                amount: new Money(r.amount as string),
+                splitMethod: r.splitMethod as SplitMethodType,
+                category: r.category as ExpenseCategory | undefined,
+                occurredAt: r.occurredAt as Date,
+                shares: (r.shares as Array<{ memberId: string; amount: string }>).map(s => ({
+                    memberId: s.memberId,
+                    amount: new Money(s.amount),
+                })),
+                editedByUserId: r.editedBy as string,
+                editedAt: r.editedAt as Date,
+            }))
     }
 
     async softDelete(id: string, deletedByUserId: string): Promise<void> {

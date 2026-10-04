@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prismaClient'
-import { ExpenseRepository, FindManyByGroupParams, FindManyByGroupResult } from '../../../application/repositories/expense-repository'
+import {
+    ExpenseRepository,
+    ExpenseRevisionRecord,
+    FindManyByGroupParams,
+    FindManyByGroupResult,
+} from '../../../application/repositories/expense-repository'
 import { Expense } from '../../../domain/entities/expense'
 import { ExpenseShare } from '../../../domain/entities/expense-share'
 import { Money } from '../../../domain/value-objects/money'
@@ -208,6 +213,29 @@ export class PrismaExpenseRepository implements ExpenseRepository {
             data: { category },
         })
         return count === 1
+    }
+
+    async findRevisions(expenseId: string): Promise<ExpenseRevisionRecord[]> {
+        const rows = await prisma.expenseRevision.findMany({
+            where: { expenseId },
+            orderBy: { version: 'desc' },
+        })
+
+        return rows.map(row => ({
+            version: row.version,
+            description: row.description,
+            amount: new Money(row.amount.toString()),
+            splitMethod: row.splitMethod as SplitMethodType,
+            category: toCategory(row.category),
+            occurredAt: row.occurredAt,
+            // Gravado pelo próprio updateWithRevision como [{ memberId, amount }], com amount em texto.
+            shares: (row.shares as Array<{ memberId: string; amount: string }>).map(share => ({
+                memberId: share.memberId,
+                amount: new Money(share.amount),
+            })),
+            editedByUserId: row.editedBy,
+            editedAt: row.editedAt,
+        }))
     }
 
     async softDelete(id: string, deletedByUserId: string): Promise<void> {

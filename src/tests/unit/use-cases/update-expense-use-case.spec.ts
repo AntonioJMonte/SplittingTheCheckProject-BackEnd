@@ -13,6 +13,7 @@ import { ExpenseNotFoundError } from '../../../shared/errors/expense-not-found-e
 import { NotGroupMemberError } from '../../../shared/errors/not-group-member-error'
 import { UnauthorizedError } from '../../../shared/errors/unauthorized-error'
 import { MemberNotInGroupError } from '../../../shared/errors/member-not-in-group-error'
+import { ExpenseConcurrentModificationError } from '../../../shared/errors/expense-concurrent-modification-error'
 import { FakeExpenseCategorizer } from '../../helpers/fake-expense-categorizer'
 
 describe('UpdateExpenseUseCase', () => {
@@ -65,6 +66,7 @@ describe('UpdateExpenseUseCase', () => {
     const { expense: updated } = await sut.execute({
       expenseId: expense.id,
       requestUserId: owner.userId,
+      version: 0,
       description: 'Almoço atualizado',
     })
 
@@ -89,6 +91,7 @@ describe('UpdateExpenseUseCase', () => {
     const { expense: updated } = await sut.execute({
       expenseId: memberPayerExpense.id,
       requestUserId: owner.userId,
+      version: 0,
       description: 'Compra atualizada',
     })
 
@@ -107,7 +110,7 @@ describe('UpdateExpenseUseCase', () => {
     })
     await settlementRepository.create(pendingSettlement)
 
-    await sut.execute({ expenseId: expense.id, requestUserId: owner.userId, description: 'Novo' })
+    await sut.execute({ expenseId: expense.id, requestUserId: owner.userId, version: 0, description: 'Novo' })
 
     const remaining = settlementRepository.items.find(s => s.id === pendingSettlement.id)
     expect(remaining!.status).toBe('CANCELLED')
@@ -115,7 +118,7 @@ describe('UpdateExpenseUseCase', () => {
 
   it('should throw ExpenseNotFoundError when expense does not exist', async () => {
     await expect(
-      sut.execute({ expenseId: 'nonexistent', requestUserId: owner.userId }),
+      sut.execute({ expenseId: 'nonexistent', requestUserId: owner.userId, version: 0 }),
     ).rejects.toBeInstanceOf(ExpenseNotFoundError)
   })
 
@@ -124,7 +127,7 @@ describe('UpdateExpenseUseCase', () => {
     await expenseRepository.create(expense)
 
     await expect(
-      sut.execute({ expenseId: expense.id, requestUserId: 'stranger' }),
+      sut.execute({ expenseId: expense.id, requestUserId: 'stranger', version: 0 }),
     ).rejects.toBeInstanceOf(NotGroupMemberError)
   })
 
@@ -138,7 +141,7 @@ describe('UpdateExpenseUseCase', () => {
     await expenseRepository.create(expense)
 
     await expect(
-      sut.execute({ expenseId: expense.id, requestUserId: thirdMember.userId }),
+      sut.execute({ expenseId: expense.id, requestUserId: thirdMember.userId, version: 0 }),
     ).rejects.toBeInstanceOf(UnauthorizedError)
   })
 
@@ -150,6 +153,7 @@ describe('UpdateExpenseUseCase', () => {
       sut.execute({
         expenseId: expense.id,
         requestUserId: owner.userId,
+        version: 0,
         shares: [
           { memberId: owner.id, amount: '30.00' },
           { memberId: 'outsider-id', amount: '30.00' },
@@ -166,6 +170,7 @@ describe('UpdateExpenseUseCase', () => {
       const { expense: updated, pendingCategorization } = await sut.execute({
         expenseId: expense.id,
         requestUserId: owner.userId,
+        version: 0,
         description: 'Cinema com a turma',
         category: 'Lazer',
       })
@@ -184,6 +189,7 @@ describe('UpdateExpenseUseCase', () => {
       const { expense: updated, pendingCategorization } = await sut.execute({
         expenseId: expense.id,
         requestUserId: owner.userId,
+        version: 0,
         description: 'Cinema com a turma',
       })
 
@@ -198,6 +204,7 @@ describe('UpdateExpenseUseCase', () => {
       const { expense: updated, pendingCategorization } = await sut.execute({
         expenseId: expense.id,
         requestUserId: owner.userId,
+        version: 0,
         description: 'Rateio diverso',
       })
 
@@ -214,6 +221,7 @@ describe('UpdateExpenseUseCase', () => {
       const { expense: updated, pendingCategorization } = await sut.execute({
         expenseId: expense.id,
         requestUserId: owner.userId,
+        version: 0,
         description: '  Jantar  ',
         amount: '60.00',
       })
@@ -221,6 +229,41 @@ describe('UpdateExpenseUseCase', () => {
       expect(updated.category).toBe('Alimentação')
       expect(pendingCategorization).toBe(false)
       expect(categorizer.quickCalls).toHaveLength(0)
+    })
+  })
+
+  describe('version lida pelo cliente (D-92)', () => {
+    it('devolve a despesa com a versão que ficou gravada', async () => {
+      const expense = makeExpense()
+      await expenseRepository.create(expense)
+
+      const { expense: updated } = await sut.execute({ expenseId: expense.id, requestUserId: owner.userId, version: 0, description: 'Novo' })
+
+      expect(updated.version).toBe(1)
+      expect((await expenseRepository.findById(expense.id))?.version).toBe(1)
+    })
+
+    it('recusa com 409 uma edição feita sobre uma versão que já não é a atual, sem gravar nem revisar', async () => {
+      const expense = makeExpense()
+      await expenseRepository.create(expense)
+      await sut.execute({ expenseId: expense.id, requestUserId: owner.userId, version: 0, description: 'Primeira' })
+
+      await expect(
+        sut.execute({ expenseId: expense.id, requestUserId: owner.userId, version: 0, description: 'Tela velha' }),
+      ).rejects.toBeInstanceOf(ExpenseConcurrentModificationError)
+
+      expect((await expenseRepository.findById(expense.id))?.description).toBe('Primeira')
+      expect(expenseRepository.revisions).toHaveLength(1)
+      expect(settlementRepository.items).toHaveLength(0)
+    })
+
+    it('checa permissão antes da versão: quem não pode editar recebe 403, não 409', async () => {
+      const expense = makeExpense()
+      await expenseRepository.create(expense)
+
+      await expect(
+        sut.execute({ expenseId: expense.id, requestUserId: member2.userId, version: 99, description: 'Intrusa' }),
+      ).rejects.toBeInstanceOf(UnauthorizedError)
     })
   })
 })

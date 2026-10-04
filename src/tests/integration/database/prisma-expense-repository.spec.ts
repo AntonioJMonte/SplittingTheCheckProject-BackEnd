@@ -257,6 +257,31 @@ describe('PrismaExpenseRepository (Postgres real)', () => {
         })
     })
 
+    describe('findRevisions (D-93)', () => {
+        it('should read the revisions back newest first, with exact amounts and who edited', async () => {
+            const original = makeExpense({
+                payer: 'alice', description: 'Jantar', amount: '90.00', category: 'Alimentação',
+                shares: [['alice', '30.00'], ['bob', '30.00'], ['carla', '30.00']],
+            })
+            await repository.create(original)
+            await repository.updateWithRevision(original.update({ description: 'Jantar com sobremesa' }), original, users.bob)
+            const current = (await repository.findById(original.id))!
+            await repository.updateWithRevision(current.update({ description: 'Terceira' }), current, users.carla)
+
+            const revisions = await repository.findRevisions(original.id)
+
+            expect(revisions.map(r => [r.version, r.description, r.editedByUserId])).toEqual([
+                [1, 'Jantar com sobremesa', users.carla],
+                [0, 'Jantar', users.bob],
+            ])
+            expect(revisions[1]).toMatchObject({ splitMethod: 'FIXED', category: 'Alimentação' })
+            expect(revisions[1].amount.toString()).toBe('90.00')
+            expect(revisions[1].shares.map(s => s.amount.toString())).toEqual(['30.00', '30.00', '30.00'])
+            expect(revisions[0].editedAt).toBeInstanceOf(Date)
+            expect(await repository.findRevisions(randomUUID())).toEqual([])
+        })
+    })
+
     describe('updateCategory', () => {
         it('should write only while the description is the one that was categorized', async () => {
             const expense = makeExpense({ payer: 'alice', description: 'Uber', amount: '10.00', shares: [['alice', '10.00']] })

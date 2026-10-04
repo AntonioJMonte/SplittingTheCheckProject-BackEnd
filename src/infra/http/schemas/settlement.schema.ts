@@ -29,6 +29,28 @@ const settlementShape = z.object({
     confirmedAt: z.date().nullable().optional(),
 })
 
+export const listSettlementsQuery = z.object({
+    status: z.enum(['PENDING', 'CONFIRMED', 'CANCELLED']).optional().describe('Sem filtro, devolve todos'),
+})
+
+export const listSettlementsRouteSchema = {
+    summary: 'Listar acertos do grupo',
+    description: 'Acertos registrados no grupo, mais recentes primeiro. Com `status=PENDING`, o credor encontra o que ainda precisa reconhecer em `PATCH /settlements/:settlementId/acknowledge`, mesmo que estivesse offline quando o evento `settlement_confirmed` foi emitido.',
+    tags: ['Settlements'],
+    security: [{ bearerAuth: [] }],
+    params: groupIdParam,
+    querystring: listSettlementsQuery,
+    response: {
+        200: z.object({
+            settlements: z.array(settlementShape.extend({ createdAt: z.date() })),
+        }).describe('Acertos do grupo'),
+        400: badRequest,
+        401: unauthorized,
+        403: forbidden,
+        404: notFound,
+    },
+}
+
 const computedSettlementShape = z.object({
     fromMemberId: z.uuid(),
     fromMemberName: z.string(),

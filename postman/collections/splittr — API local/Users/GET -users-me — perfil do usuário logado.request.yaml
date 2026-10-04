@@ -1,0 +1,5 @@
+$kind: http-request
+name: GET /users/me — perfil do usuário logado
+url: "{{baseUrl}}/users/me"
+method: GET
+order: 500

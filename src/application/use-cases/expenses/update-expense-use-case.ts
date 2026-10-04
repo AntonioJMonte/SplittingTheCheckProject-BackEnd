@@ -21,6 +21,8 @@ interface ShareInput {
 interface UpdateExpenseUseCaseRequest {
     expenseId: string
     requestUserId: string
+    /** D-92: a versão que o cliente leu. Diferente da atual = ele editou uma tela desatualizada. */
+    version: number
     description?: string
     amount?: string
     splitMethod?: SplitMethodType
@@ -46,6 +48,7 @@ export class UpdateExpenseUseCase {
     async execute({
         expenseId,
         requestUserId,
+        version,
         description,
         amount,
         splitMethod,
@@ -66,6 +69,11 @@ export class UpdateExpenseUseCase {
         const isOwner = requestingMember.isOwner()
         if (!isPayer && !isOwner) {
             throw new UnauthorizedError()
+        }
+
+        // D-92: depois das checagens de permissão, para quem não pode editar receber 403, não 409.
+        if (version !== expense.version) {
+            throw new ExpenseConcurrentModificationError()
         }
 
         if (shares !== undefined) {
@@ -103,6 +111,6 @@ export class UpdateExpenseUseCase {
 
         await this.settlementRepository.cancelPendingByGroupId(expense.groupId)
 
-        return { expense: updatedExpense, pendingCategorization }
+        return { expense: updatedExpense.withVersion(expense.version + 1), pendingCategorization }
     }
 }

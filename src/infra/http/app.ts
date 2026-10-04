@@ -7,17 +7,27 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import fastifySwagger from '@fastify/swagger'
 import fastifySwaggerUi from '@fastify/swagger-ui'
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from '@fastify/type-provider-zod'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { DomainError } from '../../shared/errors/domain-error'
 import { DomainPermissionError } from '../../shared/errors/domain-permission-error'
 import { env } from '../env'
 import { logger } from '../logger/logger'
 import { globalRateLimitOptions } from './rate-limit'
+import {
+  VALIDATION_ERROR_MESSAGE,
+  isSchemaValidationError,
+  issuesFromSchemaValidation,
+  issuesFromZodError,
+} from './validation-error'
 import { userRoutes } from './routes/userRoutes'
 import { groupRoutes } from './routes/groupRoutes'
 import { expenseRoutes } from './routes/expenseRoutes'
 import { settlementRoutes } from './routes/settlementRoutes'
 import { healthRoutes } from './routes/healthRoutes'
+
+// D-90: mensagens de validação em português, como as demais mensagens de erro da API. Vale para
+// todo schema avaliado depois desta linha.
+z.config(z.locales.pt())
 
 export const app = fastify({ loggerInstance: logger })
 
@@ -133,9 +143,11 @@ app.register(healthRoutes)
 
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {
-    return reply
-      .status(400)
-      .send({ message: 'Validation error.', issues: error.issues })
+    return reply.status(400).send({ message: VALIDATION_ERROR_MESSAGE, issues: issuesFromZodError(error) })
+  }
+
+  if (isSchemaValidationError(error)) {
+    return reply.status(400).send({ message: VALIDATION_ERROR_MESSAGE, issues: issuesFromSchemaValidation(error.validation) })
   }
 
   // D-74: antes do DomainError genérico, senão a negação de permissão sairia como 400.

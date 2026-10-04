@@ -141,6 +141,19 @@ describe('PrismaSettlementRepository (Postgres real)', () => {
     expect(await repository.findPendingBetweenMembers(fromMemberId, toMemberId)).toBeNull()
   })
 
+  it('should list the group settlements newest first, optionally by status, keeping createdAt (D-89)', async () => {
+    const older = new Settlement(randomUUID(), groupId, fromMemberId, toMemberId, new Money('10.00'), 'PENDING', undefined, undefined, 0, new Date('2026-09-01T00:00:00Z'))
+    await repository.create(older)
+    await repository.updateStatus(older.id, 'CONFIRMED', 0)
+    const newer = new Settlement(randomUUID(), groupId, toMemberId, fromMemberId, new Money('3.00'), 'PENDING', undefined, undefined, 0, new Date('2026-09-15T00:00:00Z'))
+    await repository.create(newer)
+
+    expect((await repository.findByGroup(groupId)).map(s => s.id)).toEqual([newer.id, older.id])
+    expect((await repository.findByGroup(groupId, 'PENDING')).map(s => s.id)).toEqual([newer.id])
+    expect((await repository.findByGroup(groupId, 'CANCELLED'))).toEqual([])
+    expect((await repository.findById(newer.id))?.createdAt.toISOString()).toBe('2026-09-15T00:00:00.000Z')
+  })
+
   it('should list confirmed settlements of a group and of a member on either side, ignoring other groups', async () => {
     const paid = makePending('10.00')
     const received = Settlement.create({ groupId, fromMemberId: toMemberId, toMemberId: fromMemberId, amount: new Money('4.00') })
