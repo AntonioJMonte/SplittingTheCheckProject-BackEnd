@@ -1,12 +1,12 @@
 # Estado do Projeto — Splittr
 
-**Última atualização:** 2026-10-03
-**Branch:** main (sincronizada com `origin/main` em `4761f12`; API para o frontend **não commitada**)
-**Etapa atual:** 6 — Frontend. Pré-requisito em andamento: rotas que o frontend precisa (D-88…D-93), código pronto.
+**Última atualização:** 2026-10-13
+**Branch:** main (sincronizada com `origin/main` em `826b98e`)
+**Etapa atual:** 6 — Frontend. Spec e DESIGN aprovados em 13/10; plano em `../splittr-web/docs/plans/frontend-mvp.md` aguardando aprovação.
 
 ---
 
-## Concluído (confirmado no código em 03/10)
+## Concluído (confirmado no código em 13/10)
 
 - **Domínio:** 6 entidades, 5 VOs (Money, Email, `Phone`, SplitMethod, ExpenseCategory), 2 domain services
   (`DebtMinimizer` guloso O(n log n) e `SplitCalculator` com distribuição de resto).
@@ -27,7 +27,7 @@
 | README + LICENSE; 0 vulnerabilidades, auth em `preValidation`, Postman | D-63, D-64, D-83, D-84 | `0ac392d`, `ff1a921` |
 | Bloco 4: integração dos 5 repositórios, socket server, caches, bcrypt injetável, bug do `findByUserId` | D-85…D-87 | `86b79e4`…`4761f12` |
 
-### API para o frontend — pronta, **não commitada**
+### API para o frontend — commitada (`dc1ff53`, `826b98e`)
 - **D-88:** `GET /users/me` → `{ user: { id, name, email, phone, pixKey } }`.
 - **D-89:** `GET /groups/:groupId/settlements?status=` (mais recentes primeiro); `Settlement` ganhou `createdAt`.
 - **D-90:** todo erro de validação responde `{ message: 'Dados inválidos.', issues: [{ path, message }] }`,
@@ -38,7 +38,7 @@
 - **D-93:** `GET /expenses/:expenseId/revisions` com `editedBy: { userId, name }`, inclusive de quem saiu.
 - Postman: `version` no `PATCH`, 3 requests novos, script que salva o `settlementId` pendente.
 
-## Baseline de qualidade (2026-10-03)
+## Baseline de qualidade (2026-10-13)
 
 | Verificação | Resultado |
 |---|---|
@@ -46,16 +46,17 @@
 | `npx vitest run` | 511 testes, 73 arquivos, 100% |
 | `npx vitest run --coverage` | 87,86% stmts · 75,6% branch · 80,88% funcs · 88,29% lines (thresholds 84/71/78/84) |
 | `npm run test:integration` | 47 testes, 5 arquivos · `src/infra/database` 97,69 · 89,74 · 100 · 100 (thresholds 96/87/98/98) |
-| `npm audit` | 0 vulnerabilidades |
+| `npm audit` | 0 vulnerabilidades (3 avisos novos de 13/10 corrigidos no D-96) |
 | `/docs/json` | gera 22 paths com as rotas novas (verificado em runtime) |
 
 ---
 
 ## Pendências
 
-### Antes do primeiro arquivo do frontend (decisões do usuário)
-Onde o frontend mora (pasta neste repositório ou repositório separado), stack (framework, roteamento, estado,
-componentes) e como tipar a API (gerar do OpenAPI ou à mão).
+### Frontend
+Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), ainda sem `git init`. Stack e tipagem (orval)
+definidas pelo usuário em `splittr-web/docs/FRONTEND_SETUP.md`. **Aqui no back, antes da Fase 4 do front
+(codegen):** implementar D-98, D-99, D-100 e D-104 (aprovadas, não feitas).
 
 ### Lacunas pequenas encontradas no D-92 (não aprovadas, não feitas)
 - `version` **não** vem na resposta do `POST` (criar) nem do `POST .../categorize`: o campo é opcional no
@@ -67,12 +68,7 @@ Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a c
 `categorySource` (D-08 B). Refresh tokens persistidos (D-34 B). Auditoria de grupo/membro (D-80 cobriu só despesa).
 
 ### Documentação divergente do código
-- CLAUDE.md cita `tests/` na raiz e `infra/database/repositories`; o real é `src/tests/` e
-  `src/infra/database/prisma/`. CLAUDE.md diz "Fastify 4+"; o projeto usa Fastify 5, Zod 4 e TS 6.
-- CLAUDE.md diz que o domínio nunca importa de fora, mas 7 arquivos de `src/domain` importam
-  `DomainError`/`DomainPermissionError` de `src/shared/errors`.
-- `package.json` declara `"license": "ISC"` e `"main": "index.js"`; o LICENSE é MIT e a entrada é `dist/server.js`.
-- Swagger do `DELETE /expenses/:id` diz "remove permanentemente"; desde o D-72 a exclusão é lógica.
+Corrigida em 13/10 (falta commitar): stack e caminhos no CLAUDE.md, `package.json`, Swagger do `DELETE /expenses/:id`.
 
 ---
 
@@ -80,7 +76,7 @@ Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a c
 
 | ID | Tema | Situação |
 |----|------|----------|
-| — | Nenhuma | — |
+| P-8 | D-98 estendido ao `PATCH /expenses/:id` (`shareInput` é compartilhado) | Aguarda aprovação junto com o plano do front |
 
 ## Decisões tomadas
 
@@ -97,11 +93,25 @@ Todas na opção **A**, exceto **D-63** (B — `preValidation`; a A, `onRequest`
 implementar: tiraria anônimos do rate limit), **D-90** (B — `issues` + Zod em português) e **D-91** (B — `/refresh`
 no limite global). **D-65** descartada.
 
+### 2026-10-13 (D-94…D-96)
+Todas na opção **A**: regra do CLAUDE.md passa a permitir que o domínio importe `src/shared`, `decimal.js` e
+`node:crypto` (D-94); `CLAUDE.MD` renomeado para `CLAUDE.md` no git (D-95); `npm audit fix` atualizou
+`fast-jwt` 6.3.4, `fast-copy` 4.1.2 e `source-map-js` 1.2.2, só no lock (D-96).
+
+### 2026-10-13 — frontend (D-97…D-104)
+Todas na opção **A**: front em repositório próprio, pasta irmã (D-97); valores monetários aceitos como string
+nas requisições, além de number (D-98); saldos descontam acertos CONFIRMED e o cache é invalidado em
+membro/saída/acerto (D-99); `userId` nos membros (D-100); refresh automático no front (D-101); diálogo de chave
+Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas para português (D-104).
+
 ---
 
 ## Riscos e observações
 
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
+- **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
+- **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
+- **Fórmula de saldo copiada em 3 use cases** (saldos, compute, confirm). O D-99 mexe numa delas.
 - **Dublês em memória não modelam soft delete na linha:** filtram pelo agregado. Regra de `deletedAt`
   só se prova na integração.
 - **Ramo de `ZodError` no error handler hoje é inalcançável**: nenhum controller chama `.parse()`. Mantido
@@ -110,16 +120,18 @@ no limite global). **D-65** descartada.
 - **Rodar um spec de integração sozinho reprova a catraca** (D-86). Use `--coverage.enabled=false`.
 - **Relatório principal mostra repositórios em ~0%** de propósito: lá são mockados; a medida real é a da integração.
 - **Thresholds do relatório principal** seguem 84/71/78/84 com o medido em ~88/76/81/88: dá para subir.
+- **Depois de `git pull` que mexe no lock, rode `npm ci`:** em 13/10 o `node_modules` velho derrubou `tsc` e um spec.
 - **Rate limit pendura o hook na rota** (`onRoute`): auth em `onRequest` escaparia dele (D-63).
 - **Vitest avisa "ESM syntax in a file loaded as CommonJS"** nos configs; roda normalmente.
 - **Logout não invalida o access token** (D-36): a sessão morre em até 15 min.
 - **Fail-closed é intencional** (D-37) e **o rate limit é o oposto** (D-68): sem Redis ele não bloqueia.
 - **`vitest.config.ts` define `ANTHROPIC_API_KEY: ''` de propósito.** Compose usa segredos do `.env`.
-- **Sem linter.** O arquivo de instruções está em disco como `CLAUDE.MD` (maiúsculo).
-- **Repositório em** `C:\Dev\Projeto Rachamento de Contas\SplittingTheCheckProject`; `prisma migrate dev` não
+- **Sem linter.**
+- **Repositório em** `C:\dev\Projeto Rachamento de Contas\ProjetoRachamentoDeContas`; `prisma migrate dev` não
   funciona nesta sessão (interativo): migrations são escritas à mão e aplicadas com `migrate deploy`.
 
 ## Próximo passo
 
-1. Commitar D-88…D-93 (mensagens sugeridas na sessão de 03/10).
-2. Decidir onde o frontend mora, a stack e a tipagem da API; depois, as lacunas do D-92.
+1. Commitar as correções de 13/10 (documentação, rename e lock).
+2. Aprovar o plano do front; a Fase B dele (D-98…D-100, D-104) roda aqui, depois do passo 1.
+3. Implementar D-98…D-100 e D-104 aqui antes da Fase 4 do front.
