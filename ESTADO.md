@@ -114,8 +114,8 @@ também no `PATCH` de despesa) aprovada com o plano do front.
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
-- **Fórmula de saldo copiada em 3 use cases** (saldos, compute, confirm). Com o D-99 as três descontam acertos
-  confirmados; mudar uma exige mudar as outras.
+- **Fórmula de saldo copiada em 5 use cases** (saldos, compute, confirm, leave, remove). Com o D-99 todas descontam
+  acertos confirmados; mudar uma exige mudar as outras. Cache `grupo:*:saldos` gravado antes do D-99 vive até 24h: apague no Redis de dev.
 - **Dublês em memória não modelam soft delete na linha:** filtram pelo agregado. Regra de `deletedAt`
   só se prova na integração.
 - **Ramo de `ZodError` no error handler hoje é inalcançável**: nenhum controller chama `.parse()`. Mantido

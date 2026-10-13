@@ -485,3 +485,24 @@ describe('Saldos descontam acertos confirmados e o cache acompanha (D-99)', () =
         expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
     })
 })
+
+describe('Valores monetários como string no PATCH de despesa (D-98 + P-8)', () => {
+    it('edita valor e partes enviados em string, sem passar por float', async () => {
+        const expense = makeExpense()
+        repos.expenses.items.push(expense)
+
+        const res = await app.inject({
+            method: 'PATCH', url: `/expenses/${expense.id}`, headers: bearer(ana),
+            payload: {
+                amount: '100.10', splitMethod: 'FIXED', version: 0,
+                shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+            },
+        })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json().expense).toMatchObject({
+            amount: '100.10',
+            shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+        })
+    })
+})
