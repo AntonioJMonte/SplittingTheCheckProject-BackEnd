@@ -362,3 +362,17 @@ describe('Mensagens de login e cadastro em português (D-104)', () => {
         expect(res.json()).toEqual({ message: 'Já existe uma conta com este email.' })
     })
 })
+
+describe('userId nos membros (D-100)', () => {
+    it('devolve o userId de cada membro no detalhe do grupo e na listagem de membros', async () => {
+        const expected = [[anaMember.id, ana.id], [brunoMember.id, bruno.id]]
+
+        const detail = await app.inject({ method: 'GET', url: `/groups/${group.id}`, headers: bearer(ana) })
+        const list = await app.inject({ method: 'GET', url: `/groups/${group.id}/members`, headers: bearer(ana) })
+
+        expect(detail.statusCode).toBe(200)
+        expect(detail.json().group.members.map((m: { id: string; userId: string }) => [m.id, m.userId])).toEqual(expected)
+        expect(list.statusCode).toBe(200)
+        expect(list.json().members.map((m: { id: string; userId: string }) => [m.id, m.userId])).toEqual(expected)
+    })
+})

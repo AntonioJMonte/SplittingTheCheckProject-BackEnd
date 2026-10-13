@@ -89,6 +89,7 @@ export class PrismaMemberRepository implements MemberRepository {
 
         return rows.map(row => ({
             id: row.id,
+            userId: row.userId,
             role: row.role as 'OWNER' | 'MEMBER',
             joinedAt: row.joinedAt,
             name: row.user.name,

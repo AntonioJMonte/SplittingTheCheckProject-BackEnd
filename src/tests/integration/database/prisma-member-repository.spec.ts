@@ -103,9 +103,9 @@ describe('PrismaMemberRepository (Postgres real)', () => {
 
         const members = await repository.findByGroupIdWithUser(groupId)
 
-        expect(members.map(m => [m.name, m.email, m.role])).toEqual([
-            ['alice', 'alice@test.com', 'OWNER'],
-            ['carla', 'carla@test.com', 'MEMBER'],
+        expect(members.map(m => [m.name, m.email, m.role, m.userId])).toEqual([
+            ['alice', 'alice@test.com', 'OWNER', ownerUserId],
+            ['carla', 'carla@test.com', 'MEMBER', carlaUserId],
         ])
     })
 })

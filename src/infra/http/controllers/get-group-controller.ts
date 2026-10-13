@@ -22,6 +22,7 @@ export async function getGroup(request: FastifyRequest<{ Params: GetGroupParams 
             description: group.description,
             members: members.map(member => ({
                 id: member.id,
+                userId: member.userId,
                 role: member.role,
                 joinedAt: member.joinedAt,
                 name: member.name,
