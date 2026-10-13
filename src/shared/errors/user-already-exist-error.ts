@@ -3,7 +3,7 @@ import { DomainError } from "./domain-error";
 
 export class UserAlreadyExistError extends DomainError {
     constructor () {
-        super('User With Email Already Exist')
+        super('Já existe uma conta com este email.')
     }
 
 }

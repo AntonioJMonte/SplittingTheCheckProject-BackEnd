@@ -342,3 +342,23 @@ describe('GET /expenses/:expenseId/revisions (D-93)', () => {
         expect(deleted.statusCode).toBe(404)
     })
 })
+
+describe('Mensagens de login e cadastro em português (D-104)', () => {
+    it('responde 401 em português para credenciais erradas', async () => {
+        const res = await app.inject({
+            method: 'POST', url: '/auth', payload: { email: 'ninguem@example.com', password: 'senha-errada' },
+        })
+
+        expect(res.statusCode).toBe(401)
+        expect(res.json()).toEqual({ message: 'Email ou senha incorretos.' })
+    })
+
+    it('responde 409 em português para email já cadastrado', async () => {
+        const res = await app.inject({
+            method: 'POST', url: '/register', payload: { name: 'Outra Ana', email: 'ana@example.com', password: 'senha-forte-123' },
+        })
+
+        expect(res.statusCode).toBe(409)
+        expect(res.json()).toEqual({ message: 'Já existe uma conta com este email.' })
+    })
+})
