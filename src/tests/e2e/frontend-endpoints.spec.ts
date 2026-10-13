@@ -376,3 +376,53 @@ describe('userId nos membros (D-100)', () => {
         expect(list.json().members.map((m: { id: string; userId: string }) => [m.id, m.userId])).toEqual(expected)
     })
 })
+
+describe('Valores monetários como string (D-98)', () => {
+    function expensePayload(amount: unknown) {
+        return { description: 'Mercado', amount, payerId: ana.id, splitMethod: 'EQUAL', category: 'Compras', shares: [{ memberId: anaMember.id }] }
+    }
+
+    it('cria despesa com valor e partes em string, sem passar por float', async () => {
+        const res = await app.inject({
+            method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana),
+            payload: {
+                description: 'Mercado', amount: '100.10', payerId: ana.id, splitMethod: 'FIXED', category: 'Compras',
+                shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+            },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().expense).toMatchObject({
+            amount: '100.10',
+            shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+        })
+    })
+
+    it('continua aceitando number para quem já usa a API', async () => {
+        const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload(90) })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().expense.amount).toBe('90.00')
+    })
+
+    it('recusa string com mais de 2 casas, com vírgula, zerada ou sem número', async () => {
+        for (const amount of ['10.005', '10,00', '0.00', 'abc']) {
+            const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload(amount) })
+
+            expect(res.statusCode, amount).toBe(400)
+            expect(res.json().issues.map((i: { path: string }) => i.path), amount).toContain('amount')
+        }
+    })
+
+    it('registra acerto com valor em string', async () => {
+        repos.expenses.items.push(makeExpense())
+
+        const res = await app.inject({
+            method: 'POST', url: `/groups/${group.id}/settlements`, headers: bearer(bruno),
+            payload: { fromMemberId: brunoMember.id, toMemberId: anaMember.id, amount: '45.00' },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().settlement).toMatchObject({ amount: '45.00', status: 'PENDING' })
+    })
+})

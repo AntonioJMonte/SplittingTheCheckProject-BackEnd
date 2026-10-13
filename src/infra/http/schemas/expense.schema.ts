@@ -1,18 +1,18 @@
 import z from 'zod'
 import { EXPENSE_CATEGORIES } from '../../../domain/value-objects/expense-category'
-import { badRequest, conflict, forbidden, notFound, unauthorized } from './shared.schema'
+import { badRequest, conflict, forbidden, moneyInput, notFound, unauthorized } from './shared.schema'
 
 const expenseCategory = z.enum(EXPENSE_CATEGORIES)
 
 const shareInput = z.object({
     memberId: z.uuid(),
-    amount: z.number().positive().optional().describe('Valor fixo da parte; use com splitMethod FIXED'),
+    amount: moneyInput.optional().describe('Valor fixo da parte; use com splitMethod FIXED'),
     percentage: z.number().positive().optional().describe('Percentual da parte; use com splitMethod PERCENTAGE'),
 })
 
 export const createExpenseBody = z.object({
     description: z.string().min(1).describe('Texto usado também pela categorização automática'),
-    amount: z.number().positive(),
+    amount: moneyInput,
     payerId: z.uuid().describe('Id do usuário que pagou'),
     occurredAt: z.iso.datetime().optional().describe('Data da despesa em ISO 8601; padrão é agora'),
     splitMethod: z.enum(['EQUAL', 'FIXED', 'PERCENTAGE']),
@@ -33,7 +33,7 @@ export const createExpenseBody = z.object({
 
 export const updateExpenseBody = z.object({
     description: z.string().min(1).optional(),
-    amount: z.number().positive().optional(),
+    amount: moneyInput.optional(),
     splitMethod: z.enum(['EQUAL', 'FIXED', 'PERCENTAGE']).optional(),
     shares: z.array(shareInput).min(1).optional(),
     category: expenseCategory.optional(),

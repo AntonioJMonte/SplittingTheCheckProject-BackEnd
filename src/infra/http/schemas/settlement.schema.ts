@@ -1,10 +1,10 @@
 import z from 'zod'
-import { badRequest, conflict, forbidden, notFound, unauthorized, unprocessableEntity } from './shared.schema'
+import { badRequest, conflict, forbidden, moneyInput, notFound, unauthorized, unprocessableEntity } from './shared.schema'
 
 export const confirmSettlementBody = z.object({
     fromMemberId: z.uuid().describe('Membro devedor — precisa ser o usuário autenticado'),
     toMemberId: z.uuid().describe('Membro credor'),
-    amount: z.number().positive().describe('Não pode exceder a dívida calculada'),
+    amount: moneyInput.describe('Não pode exceder a dívida calculada'),
 }).meta({
     example: {
         fromMemberId: '3f2504e0-4f89-41d3-9a0c-0305e82c3302',

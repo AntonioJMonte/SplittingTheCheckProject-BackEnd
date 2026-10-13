@@ -17,8 +17,8 @@ type CreateExpenseBody = z.infer<typeof createExpenseBody>
 // A divisão em si é regra de domínio e vive no SplitCalculator, que distribui o resto em centavos
 // para a soma das partes bater com o total. Aqui só traduzimos o payload HTTP para a chamada.
 function resolveShareAmounts(
-    shares: Array<{ memberId: string; amount?: number; percentage?: number }>,
-    total: number,
+    shares: Array<{ memberId: string; amount?: number | string; percentage?: number }>,
+    total: number | string,
     splitMethod: SplitMethodType,
 ): Array<{ memberId: string; amount: string }> {
     const totalMoney = new Money(String(total))
