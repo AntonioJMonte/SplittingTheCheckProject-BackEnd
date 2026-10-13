@@ -2,7 +2,7 @@
   "name": "projetorachamentodecontas",
   "version": "1.0.0",
   "description": "> API REST + WebSocket para grupos compartilharem despesas e calcularem automaticamente quem deve a quem, usando algoritmo de minimização de transações, sincronização em tempo real e categorização inteligente de despesas via LLM.",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -23,7 +23,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/AntonioJMonte/SplittingTheCheckProject/issues"
