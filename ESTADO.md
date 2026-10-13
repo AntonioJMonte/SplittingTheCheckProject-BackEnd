@@ -1,8 +1,8 @@
 # Estado do Projeto — Splittr
 
 **Última atualização:** 2026-10-13
-**Branch:** main (sincronizada com `origin/main` em `826b98e`)
-**Etapa atual:** 6 — Frontend. Spec e DESIGN aprovados em 13/10; plano em `../splittr-web/docs/plans/frontend-mvp.md` aguardando aprovação.
+**Branch:** `fix/api-para-o-front` (Fase B do plano do front), a partir de `main` em `79fa35d`
+**Etapa atual:** 6 — Frontend. Spec, DESIGN e plano (`../splittr-web/docs/plans/frontend-mvp.md`) aprovados em 13/10; front em construção.
 
 ---
 
@@ -38,13 +38,19 @@
 - **D-93:** `GET /expenses/:expenseId/revisions` com `editedBy: { userId, name }`, inclusive de quem saiu.
 - Postman: `version` no `PATCH`, 3 requests novos, script que salva o `settlementId` pendente.
 
+### Contrato do back para o front — Fase B (branch `fix/api-para-o-front`, um commit por decisão)
+- **D-104:** login e cadastro respondem em português ("Email ou senha incorretos.", "Já existe uma conta com este email.").
+- **D-100:** `GET /groups/:id` e `/members` trazem `userId` em cada membro.
+- **D-98 (+P-8):** `amount` de despesa (criar e editar), partes e acerto aceitam string decimal com até 2 casas, além de number.
+- **D-99:** `GET /balances` desconta acertos CONFIRMED; cache de saldos invalidado ao adicionar/remover membro, sair e confirmar acerto.
+
 ## Baseline de qualidade (2026-10-13)
 
 | Verificação | Resultado |
 |---|---|
 | `npx tsc --noEmit` | limpo |
-| `npx vitest run` | 511 testes, 73 arquivos, 100% |
-| `npx vitest run --coverage` | 87,86% stmts · 75,6% branch · 80,88% funcs · 88,29% lines (thresholds 84/71/78/84) |
+| `npx vitest run` | 526 testes, 73 arquivos, 100% |
+| `npx vitest run --coverage` | 88,07% stmts · 75,75% branch · 81,16% funcs · 88,45% lines (thresholds 84/71/78/84) |
 | `npm run test:integration` | 47 testes, 5 arquivos · `src/infra/database` 97,69 · 89,74 · 100 · 100 (thresholds 96/87/98/98) |
 | `npm audit` | 0 vulnerabilidades (3 avisos novos de 13/10 corrigidos no D-96) |
 | `/docs/json` | gera 22 paths com as rotas novas (verificado em runtime) |
@@ -54,9 +60,8 @@
 ## Pendências
 
 ### Frontend
-Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), ainda sem `git init`. Stack e tipagem (orval)
-definidas pelo usuário em `splittr-web/docs/FRONTEND_SETUP.md`. **Aqui no back, antes da Fase 4 do front
-(codegen):** implementar D-98, D-99, D-100 e D-104 (aprovadas, não feitas).
+Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), repositório `SplittingTheCheckProject-FrontEnd`,
+com PRs empilhados por fase. D-98, D-99, D-100 e D-104 implementadas aqui na Fase B; falta o merge do PR.
 
 ### Lacunas pequenas encontradas no D-92 (não aprovadas, não feitas)
 - `version` **não** vem na resposta do `POST` (criar) nem do `POST .../categorize`: o campo é opcional no
@@ -67,16 +72,13 @@ definidas pelo usuário em `splittr-web/docs/FRONTEND_SETUP.md`. **Aqui no back,
 Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a categorização (hoje em memória).
 `categorySource` (D-08 B). Refresh tokens persistidos (D-34 B). Auditoria de grupo/membro (D-80 cobriu só despesa).
 
-### Documentação divergente do código
-Corrigida em 13/10 (falta commitar): stack e caminhos no CLAUDE.md, `package.json`, Swagger do `DELETE /expenses/:id`.
-
 ---
 
 ## Decisões pendentes
 
 | ID | Tema | Situação |
 |----|------|----------|
-| P-8 | D-98 estendido ao `PATCH /expenses/:id` (`shareInput` é compartilhado) | Aguarda aprovação junto com o plano do front |
+| — | Nenhuma | — |
 
 ## Decisões tomadas
 
@@ -102,7 +104,8 @@ Todas na opção **A**: regra do CLAUDE.md passa a permitir que o domínio impor
 Todas na opção **A**: front em repositório próprio, pasta irmã (D-97); valores monetários aceitos como string
 nas requisições, além de number (D-98); saldos descontam acertos CONFIRMED e o cache é invalidado em
 membro/saída/acerto (D-99); `userId` nos membros (D-100); refresh automático no front (D-101); diálogo de chave
-Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas para português (D-104).
+Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas para português (D-104). P-8 (D-98
+também no `PATCH` de despesa) aprovada com o plano do front.
 
 ---
 
@@ -111,7 +114,8 @@ Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
-- **Fórmula de saldo copiada em 3 use cases** (saldos, compute, confirm). O D-99 mexe numa delas.
+- **Fórmula de saldo copiada em 3 use cases** (saldos, compute, confirm). Com o D-99 as três descontam acertos
+  confirmados; mudar uma exige mudar as outras.
 - **Dublês em memória não modelam soft delete na linha:** filtram pelo agregado. Regra de `deletedAt`
   só se prova na integração.
 - **Ramo de `ZodError` no error handler hoje é inalcançável**: nenhum controller chama `.parse()`. Mantido
@@ -132,6 +136,5 @@ Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas
 
 ## Próximo passo
 
-1. Commitar as correções de 13/10 (documentação, rename e lock).
-2. Aprovar o plano do front; a Fase B dele (D-98…D-100, D-104) roda aqui, depois do passo 1.
-3. Implementar D-98…D-100 e D-104 aqui antes da Fase 4 do front.
+1. Revisar e integrar o PR de `fix/api-para-o-front` (Fase B).
+2. O front segue a partir da Fase 4 (codegen contra o `/docs/json` com a Fase B).

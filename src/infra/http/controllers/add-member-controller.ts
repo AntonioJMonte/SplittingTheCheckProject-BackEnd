@@ -3,6 +3,7 @@ import type z from 'zod'
 import { makeAddMemberUseCase } from '../../factories/make-add-member-use-case'
 import type { groupIdParam } from '../schemas/group.schema'
 import type { addMemberBody } from '../schemas/member.schema'
+import { invalidateGroupBalancesCache } from '../../cache/group-balances-cache'
 import { io } from '../../websocket/io'
 import { emitMemberAdded } from '../../websocket/handlers/member-events'
 
@@ -29,6 +30,7 @@ export async function addMember(
         role: newMember.role,
         joinedAt: newMember.joinedAt,
     }
+    await invalidateGroupBalancesCache(groupId)
 
     if (io) {
         emitMemberAdded(io, groupId, memberPayload).catch(() => {})

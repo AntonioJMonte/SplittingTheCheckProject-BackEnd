@@ -41,10 +41,11 @@ vi.mock('../../infra/database/prisma/prismaSettlementRepository', async () => {
     repos.settlements = new InMemorySettlementRepository()
     return { PrismaSettlementRepository: function () { return repos.settlements } }
 })
+const balancesCache = vi.hoisted(() => ({ invalidate: vi.fn(async () => {}) }))
 vi.mock('../../infra/cache/group-balances-cache', () => ({
     getGroupBalancesCache: async () => null,
     setGroupBalancesCache: async () => {},
-    invalidateGroupBalancesCache: async () => {},
+    invalidateGroupBalancesCache: balancesCache.invalidate,
 }))
 vi.mock('../../infra/cache/llm-category-cache', () => ({
     buildCategoryCacheKey: () => null,
@@ -79,6 +80,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+    balancesCache.invalidate.mockClear()
     repos.users.items = []
     repos.groups.items = []
     repos.members.items = []
@@ -424,5 +426,62 @@ describe('Valores monetários como string (D-98)', () => {
 
         expect(res.statusCode).toBe(201)
         expect(res.json().settlement).toMatchObject({ amount: '45.00', status: 'PENDING' })
+    })
+})
+
+describe('Saldos descontam acertos confirmados e o cache acompanha (D-99)', () => {
+    function seedSettlement(status: 'PENDING' | 'CONFIRMED') {
+        const settlement = new Settlement(
+            crypto.randomUUID(), group.id, brunoMember.id, anaMember.id, new Money('45.00'), status,
+            status === 'CONFIRMED' ? new Date('2026-10-13T00:00:00Z') : undefined, undefined, 0, new Date('2026-10-12T00:00:00Z'),
+        )
+        repos.settlements.items.push(settlement)
+        return settlement
+    }
+
+    it('zera saldo e transferência depois que o credor confirma o acerto', async () => {
+        repos.expenses.items.push(makeExpense())
+        seedSettlement('CONFIRMED')
+
+        const res = await app.inject({ method: 'GET', url: `/groups/${group.id}/balances`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json()).toEqual({
+            memberBalances: [
+                { memberId: anaMember.id, userId: ana.id, balance: '0.00' },
+                { memberId: brunoMember.id, userId: bruno.id, balance: '0.00' },
+            ],
+            transfers: [],
+        })
+    })
+
+    it('invalida o cache ao adicionar membro', async () => {
+        const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/members`, headers: bearer(ana), payload: { email: 'carla@example.com' } })
+
+        expect(res.statusCode).toBe(201)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache ao remover membro', async () => {
+        const res = await app.inject({ method: 'DELETE', url: `/groups/${group.id}/members/${brunoMember.id}`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(204)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache quando alguém sai do grupo', async () => {
+        const res = await app.inject({ method: 'DELETE', url: `/groups/${group.id}/leave`, headers: bearer(bruno) })
+
+        expect(res.statusCode).toBe(204)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache quando o credor confirma o recebimento', async () => {
+        const pending = seedSettlement('PENDING')
+
+        const res = await app.inject({ method: 'PATCH', url: `/settlements/${pending.id}/acknowledge`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(200)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
     })
 })
