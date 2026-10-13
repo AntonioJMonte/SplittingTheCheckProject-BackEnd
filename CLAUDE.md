@@ -6,13 +6,13 @@ Calcula automaticamente quem deve a quem usando algoritmo de
 minimização de transações. Categoriza despesas via LLM como fallback.
 
 ## Stack
-- TypeScript 5+ / Node.js 24 LTS (imagem Docker `node:24-bookworm-slim`; Node 20 chegou ao fim de vida em 30/04/2026)
-- Fastify 4+ (HTTP)
+- TypeScript 6 / Node.js 24 LTS (imagem Docker `node:24-bookworm-slim`; Node 20 chegou ao fim de vida em 30/04/2026)
+- Fastify 5 (HTTP)
 - Prisma ORM 5+ / PostgreSQL 16
 - Socket.io (WebSocket)
 - Redis (cache + pub/sub)
-- Zod (validação)
-- Vitest (testes)
+- Zod 4 (validação)
+- Vitest 4 (testes)
 - decimal.js (aritmética monetária)
 - Anthropic SDK (categorização)
 - Docker Compose (ambiente local)
@@ -91,20 +91,23 @@ Regras:
 
 ## Arquitetura
 DDD + Clean Architecture em camadas. Regra inviolável:
-domínio NUNCA importa de fora. Direção de dependência:
+domínio NUNCA importa de application nem de infra. Direção de dependência:
 infra → application → domain.
+
+O domínio só pode importar de: `src/shared` (que não importa de nenhuma
+camada), `decimal.js` e `node:crypto` (D-94).
 
 Estrutura:
 - src/domain/        → entidades, value objects, services puros
 - src/application/   → use cases + interfaces de repositório
 - src/infra/         → Prisma, HTTP, WebSocket, LLM, Pix
 - src/shared/        → erros, utils
-- tests/             → unit, integration, factories
+- src/tests/         → unit, integration, e2e, factories, doubles
 
 ## Padrões obrigatórios
 - SOLID: cada arquivo tem UMA responsabilidade
 - Repositórios são interfaces em /application,
-  implementações concretas em /infra/database/repositories
+  implementações concretas em /infra/database/prisma
 - Validação de payloads com Zod nos controllers
 - Erros de domínio extendem DomainError
 - Aritmética monetária SEMPRE com decimal.js, nunca float

@@ -148,7 +148,7 @@ export const categorizeExpenseRouteSchema = {
 
 export const deleteExpenseRouteSchema = {
     summary: 'Excluir despesa',
-    description: 'Remove uma despesa permanentemente. Apenas o pagador ou OWNER podem excluir.',
+    description: 'Exclui uma despesa (exclusão lógica: some da listagem e dos saldos, mas o registro é mantido no histórico). Apenas o pagador ou OWNER podem excluir.',
     tags: ['Expenses'],
     security: [{ bearerAuth: [] }],
     params: expenseIdParam,
