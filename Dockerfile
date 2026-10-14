@@ -11,7 +11,6 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Also the target of the compose "migrate" service: it keeps the Prisma CLI and the migrations.
 FROM deps AS build
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -27,7 +26,11 @@ ENV NODE_ENV=production
 COPY --from=prod-deps --chown=node:node /app/package.json ./package.json
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
+# D-106: the Prisma CLI is a production dependency, so `migrate deploy` runs here with the schema and migrations.
+COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
 USER node
 EXPOSE 3333
-CMD ["node", "dist/server.js"]
+# Pending migrations are applied before the server starts; if one fails the server never comes up, and a platform
+# health check keeps the previous deploy serving.
+CMD ["npm", "run", "start:prod"]

@@ -1,6 +1,6 @@
 # Estado do Projeto — Splittr
 
-**Última atualização:** 2026-10-13
+**Última atualização:** 2026-10-14
 **Branch:** `fix/api-para-o-front` (Fase B do plano do front), a partir de `main` em `79fa35d`
 **Etapa atual:** 6 — Frontend. Spec, DESIGN e plano (`../splittr-web/docs/plans/frontend-mvp.md`) aprovados em 13/10; front em construção.
 
@@ -43,14 +43,23 @@
 - **D-100:** `GET /groups/:id` e `/members` trazem `userId` em cada membro.
 - **D-98 (+P-8):** `amount` de despesa (criar e editar), partes e acerto aceitam string decimal com até 2 casas, além de number.
 - **D-99:** `GET /balances` desconta acertos CONFIRMED; cache de saldos invalidado ao adicionar/remover membro, sair e confirmar acerto.
+- **D-105:** a string de dinheiro aceita no máximo 8 dígitos inteiros (até `99999999.99`, o que cabe em `Decimal(10, 2)`); 9 ou mais → 400 em `amount`.
 
-## Baseline de qualidade (2026-10-13)
+### Prontidão para deploy (checklist de 14/10, não commitado)
+- **D-106:** a imagem roda `npm run start:prod` = `prisma migrate deploy` + servidor; `prisma` foi para `dependencies` e `prisma/`
+  entra no runtime (+~61 MB); o serviço `migrate` do compose saiu. Verificado em contêiner contra schema vazio: 6 migrations,
+  `/health` 200, segundo início sem pendências, `docker stop` em 1 s.
+- Já atendidos: `/health` (Postgres + Redis, 503), `0.0.0.0` + `PORT`, CORS do Fastify e do Socket.IO por `CORS_ORIGIN`,
+  `rediss://` nos 3 clients (todos leem `REDIS_URL`).
+- **D-107 bloqueada:** o Fastify 5.12.5 tornou `trustProxy` numérico fail-closed (`lib/request.js`) e tirou `number` dos tipos. Ver D-108.
+
+## Baseline de qualidade (2026-10-14)
 
 | Verificação | Resultado |
 |---|---|
 | `npx tsc --noEmit` | limpo |
-| `npx vitest run` | 526 testes, 73 arquivos, 100% |
-| `npx vitest run --coverage` | 88,07% stmts · 75,75% branch · 81,16% funcs · 88,45% lines (thresholds 84/71/78/84) |
+| `npx vitest run` | 529 testes, 73 arquivos, 100% |
+| `npx vitest run --coverage` | 88,2% stmts · 76,06% branch · 81,67% funcs · 88,52% lines (thresholds 84/71/78/84) |
 | `npm run test:integration` | 47 testes, 5 arquivos · `src/infra/database` 97,69 · 89,74 · 100 · 100 (thresholds 96/87/98/98) |
 | `npm audit` | 0 vulnerabilidades (3 avisos novos de 13/10 corrigidos no D-96) |
 | `/docs/json` | gera 22 paths com as rotas novas (verificado em runtime) |
@@ -61,7 +70,12 @@
 
 ### Frontend
 Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), repositório `SplittingTheCheckProject-FrontEnd`,
-com PRs empilhados por fase. D-98, D-99, D-100 e D-104 implementadas aqui na Fase B; falta o merge do PR.
+com PRs empilhados por fase (#1 a #13 abertos, até a Fase 8, MVP parcialmente verificado). D-98, D-99, D-100,
+D-104 e D-105 implementadas aqui na Fase B; falta o merge do PR #1.
+
+### Lacunas encontradas no D-105 (não aprovadas, não feitas)
+- O ramo `number` do `moneyInput` não tem limite: um number acima de 99999999.99 ainda chega ao banco e responde 500.
+- O `toApiAmount` do front aceita mais de 8 dígitos inteiros; a API devolve 400 com a mensagem no campo `amount`.
 
 ### Lacunas pequenas encontradas no D-92 (não aprovadas, não feitas)
 - `version` **não** vem na resposta do `POST` (criar) nem do `POST .../categorize`: o campo é opcional no
@@ -78,7 +92,7 @@ Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a c
 
 | ID | Tema | Situação |
 |----|------|----------|
-| — | Nenhuma | — |
+| D-108 | Como confiar no proxy da plataforma, já que contar saltos (D-107 B) não funciona no Fastify 5.12.5 | Aguarda escolha (A: faixas confiáveis; B: função própria de saltos) |
 
 ## Decisões tomadas
 
@@ -107,12 +121,20 @@ membro/saída/acerto (D-99); `userId` nos membros (D-100); refresh automático n
 Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas para português (D-104). P-8 (D-98
 também no `PATCH` de despesa) aprovada com o plano do front.
 
+### 2026-10-14 (D-105…D-107)
+D-105: instrução direta do usuário (sem registro anterior nos repositórios): string de dinheiro com até 8 dígitos inteiros.
+D-106 (A): migrations na inicialização da imagem. D-107 (B): `trustProxy` por contagem de saltos; aprovada, mas inviável no
+Fastify 5.12.5; a escolha volta como D-108.
+
 ---
 
 ## Riscos e observações
 
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
+- **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
+- **Cookie de refresh entre `vercel.app` e o domínio da API é de terceiros:** o Safari bloqueia; domínio próprio resolve.
+- **`/health` responde 503 com o Redis fora:** a plataforma pode reiniciar o contêiner num soluço do Upstash.
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
 - **Fórmula de saldo copiada em 5 use cases** (saldos, compute, confirm, leave, remove). Com o D-99 todas descontam
   acertos confirmados; mudar uma exige mudar as outras. Cache `grupo:*:saldos` gravado antes do D-99 vive até 24h: apague no Redis de dev.
@@ -137,4 +159,4 @@ também no `PATCH` de despesa) aprovada com o plano do front.
 ## Próximo passo
 
 1. Revisar e integrar o PR de `fix/api-para-o-front` (Fase B).
-2. O front segue a partir da Fase 4 (codegen contra o `/docs/json` com a Fase B).
+2. Integrar os PRs do front (#1 a #13) e concluir a verificação do MVP (Fase 8).

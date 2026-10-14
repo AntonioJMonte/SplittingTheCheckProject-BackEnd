@@ -28,19 +28,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Roda uma vez e sai; o app só sobe se as migrations terminarem com sucesso.
-  migrate:
-    build:
-      context: .
-      target: build
-    command: ['npx', 'prisma', 'migrate', 'deploy']
-    environment:
-      DATABASE_URL: postgresql://splittr:splittr@postgres:5432/splittr_db?schema=public
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: 'no'
-
+  # D-106: a própria imagem aplica as migrations ao iniciar, como faria numa plataforma de um contêiner só.
   app:
     build:
       context: .
@@ -62,8 +50,6 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
