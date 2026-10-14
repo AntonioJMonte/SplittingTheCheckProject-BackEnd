@@ -2,6 +2,7 @@ import { Member } from '../../domain/entities/member'
 
 export interface MembersWithUser {
     id: string
+    userId: string
     role: 'OWNER' | 'MEMBER'
     joinedAt: Date
     name: string

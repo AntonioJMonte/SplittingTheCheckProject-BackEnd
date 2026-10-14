@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import type z from 'zod'
 import type { settlementIdParam } from '../schemas/settlement.schema'
 import { makeAcknowledgeSettlementUseCase } from '../../factories/make-acknowledge-settlement-use-case'
+import { invalidateGroupBalancesCache } from '../../cache/group-balances-cache'
 import { io } from '../../websocket/io'
 import { emitSettlementConfirmed } from '../../websocket/handlers/settlement-events'
 
@@ -15,6 +16,7 @@ export async function acknowledgeSettlement(request: FastifyRequest<{ Params: Ac
         settlementId,
         requestUserId: request.user.sub,
     })
+    await invalidateGroupBalancesCache(settlement.groupId)
 
     if (io) {
         emitSettlementConfirmed(io, settlement.groupId, {

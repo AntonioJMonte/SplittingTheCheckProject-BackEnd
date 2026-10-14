@@ -57,6 +57,7 @@ export class InMemoryMemberRepository implements MemberRepository {
                 const userData = this.userLookup.get(m.userId) ?? { name: '', email: '' }
                 return {
                     id: m.id,
+                    userId: m.userId,
                     role: m.role,
                     joinedAt: m.joinedAt,
                     name: userData.name,

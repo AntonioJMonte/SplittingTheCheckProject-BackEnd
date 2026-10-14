@@ -4,9 +4,11 @@ import { GetGroupBalancesUseCase } from '../../../application/use-cases/groups/g
 import { InMemoryGroupRepository } from '../../doubles/in-memory-group-repository'
 import { InMemoryMemberRepository } from '../../doubles/in-memory-member-repository'
 import { InMemoryExpenseRepository } from '../../doubles/in-memory-expense-repository'
+import { InMemorySettlementRepository } from '../../doubles/in-memory-settlement-repository'
 import { Group } from '../../../domain/entities/group'
 import { Member } from '../../../domain/entities/member'
 import { Expense } from '../../../domain/entities/expense'
+import { Settlement } from '../../../domain/entities/settlement'
 import { Money } from '../../../domain/value-objects/money'
 import { GroupNotFoundError } from '../../../shared/errors/group-not-found-error'
 import { AppError } from '../../../shared/errors/app-error'
@@ -15,13 +17,15 @@ describe('GetGroupBalancesUseCase', () => {
   let groupRepository: InMemoryGroupRepository
   let memberRepository: InMemoryMemberRepository
   let expenseRepository: InMemoryExpenseRepository
+  let settlementRepository: InMemorySettlementRepository
   let sut: GetGroupBalancesUseCase
 
   beforeEach(() => {
     groupRepository = new InMemoryGroupRepository()
     memberRepository = new InMemoryMemberRepository()
     expenseRepository = new InMemoryExpenseRepository()
-    sut = new GetGroupBalancesUseCase(groupRepository, memberRepository, expenseRepository)
+    settlementRepository = new InMemorySettlementRepository()
+    sut = new GetGroupBalancesUseCase(groupRepository, memberRepository, expenseRepository, settlementRepository)
   })
 
   async function makeGroupWithTwoMembers() {
@@ -90,5 +94,58 @@ describe('GetGroupBalancesUseCase', () => {
     await expect(
       sut.execute({ groupId: group.id, requestingUserId: 'stranger' }),
     ).rejects.toBeInstanceOf(AppError)
+  })
+
+  async function ownerPaysHundredSplitInHalf() {
+    const setup = await makeGroupWithTwoMembers()
+    await expenseRepository.create(Expense.create({
+      groupId: setup.group.id,
+      payerId: setup.owner.userId,
+      description: 'Jantar',
+      amount: new Money('100.00'),
+      shareInputs: [
+        { memberId: setup.owner.id, amount: new Money('50.00') },
+        { memberId: setup.member2.id, amount: new Money('50.00') },
+      ],
+      splitMethod: 'EQUAL',
+    }))
+    return setup
+  }
+
+  function settle(groupId: string, fromMemberId: string, toMemberId: string, amount: string, confirmed: boolean) {
+    const settlement = Settlement.create({ groupId, fromMemberId, toMemberId, amount: new Money(amount) })
+    if (confirmed) settlement.confirm()
+    settlementRepository.items.push(settlement)
+  }
+
+  it('should zero balances and transfers after a confirmed settlement', async () => {
+    const { group, owner, member2 } = await ownerPaysHundredSplitInHalf()
+    settle(group.id, member2.id, owner.id, '50.00', true)
+
+    const { memberBalances, transfers } = await sut.execute({ groupId: group.id, requestingUserId: owner.userId })
+
+    expect(memberBalances.every(b => b.balance.isZero())).toBe(true)
+    expect(transfers).toHaveLength(0)
+  })
+
+  it('should keep the debt while the settlement is only pending', async () => {
+    const { group, owner, member2 } = await ownerPaysHundredSplitInHalf()
+    settle(group.id, member2.id, owner.id, '50.00', false)
+
+    const { transfers } = await sut.execute({ groupId: group.id, requestingUserId: owner.userId })
+
+    expect(transfers).toHaveLength(1)
+    expect(transfers[0].amount.toNumber()).toBe(50)
+  })
+
+  it('should leave only the remainder after a partial confirmed settlement', async () => {
+    const { group, owner, member2 } = await ownerPaysHundredSplitInHalf()
+    settle(group.id, member2.id, owner.id, '30.00', true)
+
+    const { memberBalances, transfers } = await sut.execute({ groupId: group.id, requestingUserId: owner.userId })
+
+    expect(memberBalances.find(b => b.memberId === owner.id)!.balance.toString()).toBe('20')
+    expect(memberBalances.find(b => b.memberId === member2.id)!.balance.toString()).toBe('-20')
+    expect(transfers[0].amount.toNumber()).toBe(20)
   })
 })

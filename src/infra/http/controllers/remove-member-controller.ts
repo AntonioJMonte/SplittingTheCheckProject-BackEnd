@@ -3,6 +3,7 @@ import type z from 'zod'
 import { makeRemoveMemberUseCase } from '../../factories/make-remove-member-use-case'
 import type { memberIdParam } from '../schemas/member.schema'
 import type { groupIdParam } from '../schemas/group.schema'
+import { invalidateGroupBalancesCache } from '../../cache/group-balances-cache'
 import { io } from '../../websocket/io'
 import { emitMemberRemoved } from '../../websocket/handlers/member-events'
 
@@ -17,6 +18,7 @@ export async function removeMember(request: FastifyRequest<{ Params: RemoveMembe
         requestedByUserId: request.user.sub,
         targetMemberId: memberId,
     })
+    await invalidateGroupBalancesCache(groupId)
 
     if (io) {
         emitMemberRemoved(io, groupId, memberId).catch(() => {})

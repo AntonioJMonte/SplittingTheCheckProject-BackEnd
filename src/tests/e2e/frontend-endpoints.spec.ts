@@ -41,10 +41,11 @@ vi.mock('../../infra/database/prisma/prismaSettlementRepository', async () => {
     repos.settlements = new InMemorySettlementRepository()
     return { PrismaSettlementRepository: function () { return repos.settlements } }
 })
+const balancesCache = vi.hoisted(() => ({ invalidate: vi.fn(async () => {}) }))
 vi.mock('../../infra/cache/group-balances-cache', () => ({
     getGroupBalancesCache: async () => null,
     setGroupBalancesCache: async () => {},
-    invalidateGroupBalancesCache: async () => {},
+    invalidateGroupBalancesCache: balancesCache.invalidate,
 }))
 vi.mock('../../infra/cache/llm-category-cache', () => ({
     buildCategoryCacheKey: () => null,
@@ -79,6 +80,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+    balancesCache.invalidate.mockClear()
     repos.users.items = []
     repos.groups.items = []
     repos.members.items = []
@@ -340,5 +342,167 @@ describe('GET /expenses/:expenseId/revisions (D-93)', () => {
 
         expect(outsider.statusCode).toBe(403)
         expect(deleted.statusCode).toBe(404)
+    })
+})
+
+describe('Mensagens de login e cadastro em português (D-104)', () => {
+    it('responde 401 em português para credenciais erradas', async () => {
+        const res = await app.inject({
+            method: 'POST', url: '/auth', payload: { email: 'ninguem@example.com', password: 'senha-errada' },
+        })
+
+        expect(res.statusCode).toBe(401)
+        expect(res.json()).toEqual({ message: 'Email ou senha incorretos.' })
+    })
+
+    it('responde 409 em português para email já cadastrado', async () => {
+        const res = await app.inject({
+            method: 'POST', url: '/register', payload: { name: 'Outra Ana', email: 'ana@example.com', password: 'senha-forte-123' },
+        })
+
+        expect(res.statusCode).toBe(409)
+        expect(res.json()).toEqual({ message: 'Já existe uma conta com este email.' })
+    })
+})
+
+describe('userId nos membros (D-100)', () => {
+    it('devolve o userId de cada membro no detalhe do grupo e na listagem de membros', async () => {
+        const expected = [[anaMember.id, ana.id], [brunoMember.id, bruno.id]]
+
+        const detail = await app.inject({ method: 'GET', url: `/groups/${group.id}`, headers: bearer(ana) })
+        const list = await app.inject({ method: 'GET', url: `/groups/${group.id}/members`, headers: bearer(ana) })
+
+        expect(detail.statusCode).toBe(200)
+        expect(detail.json().group.members.map((m: { id: string; userId: string }) => [m.id, m.userId])).toEqual(expected)
+        expect(list.statusCode).toBe(200)
+        expect(list.json().members.map((m: { id: string; userId: string }) => [m.id, m.userId])).toEqual(expected)
+    })
+})
+
+describe('Valores monetários como string (D-98)', () => {
+    function expensePayload(amount: unknown) {
+        return { description: 'Mercado', amount, payerId: ana.id, splitMethod: 'EQUAL', category: 'Compras', shares: [{ memberId: anaMember.id }] }
+    }
+
+    it('cria despesa com valor e partes em string, sem passar por float', async () => {
+        const res = await app.inject({
+            method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana),
+            payload: {
+                description: 'Mercado', amount: '100.10', payerId: ana.id, splitMethod: 'FIXED', category: 'Compras',
+                shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+            },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().expense).toMatchObject({
+            amount: '100.10',
+            shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+        })
+    })
+
+    it('continua aceitando number para quem já usa a API', async () => {
+        const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload(90) })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().expense.amount).toBe('90.00')
+    })
+
+    it('recusa string com mais de 2 casas, com vírgula, zerada ou sem número', async () => {
+        for (const amount of ['10.005', '10,00', '0.00', 'abc']) {
+            const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload(amount) })
+
+            expect(res.statusCode, amount).toBe(400)
+            expect(res.json().issues.map((i: { path: string }) => i.path), amount).toContain('amount')
+        }
+    })
+
+    it('registra acerto com valor em string', async () => {
+        repos.expenses.items.push(makeExpense())
+
+        const res = await app.inject({
+            method: 'POST', url: `/groups/${group.id}/settlements`, headers: bearer(bruno),
+            payload: { fromMemberId: brunoMember.id, toMemberId: anaMember.id, amount: '45.00' },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().settlement).toMatchObject({ amount: '45.00', status: 'PENDING' })
+    })
+})
+
+describe('Saldos descontam acertos confirmados e o cache acompanha (D-99)', () => {
+    function seedSettlement(status: 'PENDING' | 'CONFIRMED') {
+        const settlement = new Settlement(
+            crypto.randomUUID(), group.id, brunoMember.id, anaMember.id, new Money('45.00'), status,
+            status === 'CONFIRMED' ? new Date('2026-10-13T00:00:00Z') : undefined, undefined, 0, new Date('2026-10-12T00:00:00Z'),
+        )
+        repos.settlements.items.push(settlement)
+        return settlement
+    }
+
+    it('zera saldo e transferência depois que o credor confirma o acerto', async () => {
+        repos.expenses.items.push(makeExpense())
+        seedSettlement('CONFIRMED')
+
+        const res = await app.inject({ method: 'GET', url: `/groups/${group.id}/balances`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json()).toEqual({
+            memberBalances: [
+                { memberId: anaMember.id, userId: ana.id, balance: '0.00' },
+                { memberId: brunoMember.id, userId: bruno.id, balance: '0.00' },
+            ],
+            transfers: [],
+        })
+    })
+
+    it('invalida o cache ao adicionar membro', async () => {
+        const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/members`, headers: bearer(ana), payload: { email: 'carla@example.com' } })
+
+        expect(res.statusCode).toBe(201)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache ao remover membro', async () => {
+        const res = await app.inject({ method: 'DELETE', url: `/groups/${group.id}/members/${brunoMember.id}`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(204)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache quando alguém sai do grupo', async () => {
+        const res = await app.inject({ method: 'DELETE', url: `/groups/${group.id}/leave`, headers: bearer(bruno) })
+
+        expect(res.statusCode).toBe(204)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+
+    it('invalida o cache quando o credor confirma o recebimento', async () => {
+        const pending = seedSettlement('PENDING')
+
+        const res = await app.inject({ method: 'PATCH', url: `/settlements/${pending.id}/acknowledge`, headers: bearer(ana) })
+
+        expect(res.statusCode).toBe(200)
+        expect(balancesCache.invalidate).toHaveBeenCalledWith(group.id)
+    })
+})
+
+describe('Valores monetários como string no PATCH de despesa (D-98 + P-8)', () => {
+    it('edita valor e partes enviados em string, sem passar por float', async () => {
+        const expense = makeExpense()
+        repos.expenses.items.push(expense)
+
+        const res = await app.inject({
+            method: 'PATCH', url: `/expenses/${expense.id}`, headers: bearer(ana),
+            payload: {
+                amount: '100.10', splitMethod: 'FIXED', version: 0,
+                shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+            },
+        })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json().expense).toMatchObject({
+            amount: '100.10',
+            shares: [{ memberId: anaMember.id, amount: '50.05' }, { memberId: brunoMember.id, amount: '50.05' }],
+        })
     })
 })

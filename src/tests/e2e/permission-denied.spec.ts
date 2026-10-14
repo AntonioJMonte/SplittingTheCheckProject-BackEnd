@@ -43,7 +43,7 @@ vi.mock('../../infra/database/prisma/prismaMemberRepository', () => ({
                 .filter((m: any) => m.groupId === groupId && !m.deletedBy)
                 .map((m: any) => {
                     const user = store.items.find((u: any) => u.id === m.userId)
-                    return { id: m.id, role: m.role, joinedAt: m.joinedAt, name: user?.name ?? '', email: user?.email?.value ?? '' }
+                    return { id: m.id, userId: m.userId, role: m.role, joinedAt: m.joinedAt, name: user?.name ?? '', email: user?.email?.value ?? '' }
                 })
         }
         async findRemovedByUserAndGroup(userId: string, groupId: string) {
