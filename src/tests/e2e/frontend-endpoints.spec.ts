@@ -427,6 +427,26 @@ describe('Valores monetários como string (D-98)', () => {
         expect(res.statusCode).toBe(201)
         expect(res.json().settlement).toMatchObject({ amount: '45.00', status: 'PENDING' })
     })
+
+    it('aceita até 8 dígitos inteiros, o limite da coluna Decimal(10, 2) (D-105)', async () => {
+        const res = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload('99999999.99') })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().expense.amount).toBe('99999999.99')
+    })
+
+    it('recusa string com 9 dígitos inteiros, em vez de estourar a coluna no banco (D-105)', async () => {
+        const expense = await app.inject({ method: 'POST', url: `/groups/${group.id}/expenses`, headers: bearer(ana), payload: expensePayload('123456789.00') })
+        const settlement = await app.inject({
+            method: 'POST', url: `/groups/${group.id}/settlements`, headers: bearer(bruno),
+            payload: { fromMemberId: brunoMember.id, toMemberId: anaMember.id, amount: '123456789' },
+        })
+
+        for (const res of [expense, settlement]) {
+            expect(res.statusCode).toBe(400)
+            expect(res.json().issues).toContainEqual({ path: 'amount', message: 'Use no máximo 8 dígitos antes do ponto (até 99999999.99)' })
+        }
+    })
 })
 
 describe('Saldos descontam acertos confirmados e o cache acompanha (D-99)', () => {
