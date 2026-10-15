@@ -114,7 +114,7 @@ O Splitwise resolve isso, mas é em inglês, não integra com Pix, não é open 
 
 ### Auxiliares
 
-`bcryptjs` (hash de senha) · `jsonwebtoken` + `@fastify/jwt` (JWT) · `@fastify/cookie` · `@fastify/cors` · `@fastify/helmet` · `@fastify/rate-limit` · `@fastify/swagger` · `ioredis` · `pino` (logger estruturado) · `dayjs` (datas)
+`bcryptjs` (hash de senha) · `jsonwebtoken` + `@fastify/jwt` (JWT) · `@fastify/cookie` · `@fastify/cors` · `@fastify/helmet` · `@fastify/rate-limit` · `@fastify/swagger` · `ioredis` · `pino` (logger estruturado)
 
 ---
 

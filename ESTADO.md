@@ -91,7 +91,6 @@ D-104 e D-105 implementadas aqui; o PR #1 (Fase B) foi integrado em `008e30c` e 
 - O evento `expense_updated` passou a levar `version`, porque reaproveita o payload do `PATCH` (aditivo).
 
 ### Encontrado na prontidão para deploy (15/10, não aprovado, não feito)
-- `pino-pretty` (só dev) e `dayjs` (sem uso no código) estão em `dependencies`; `start:prod` ficou sem uso (o entrypoint migra).
 - Prisma 5.22 não lista Node 22 nem 24 como suportados (Node 22 oficial só a partir do Prisma 6.0.0); a imagem segue em Node 24.
 - Integração: o teste de 5 edições concorrentes falha também na `main`; investigar pool/`maxWait` à parte.
 
