@@ -2,8 +2,9 @@
 
 FROM node:24-bookworm-slim AS base
 # Prisma's query engine links against OpenSSL; the slim image does not ship it.
+# D-109: tini runs as PID 1, forwards signals and reaps zombies, which node does not do as PID 1.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && apt-get install -y --no-install-recommends openssl ca-certificates tini \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -31,8 +32,10 @@ COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.pr
 # D-106: the Prisma CLI is a production dependency, so `migrate deploy` runs here with the schema and migrations.
 COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
+COPY --chown=node:node --chmod=755 docker-entrypoint.sh ./
 USER node
 EXPOSE 3333
-# Pending migrations are applied before the server starts; if one fails the server never comes up, and a platform
-# health check keeps the previous deploy serving.
-CMD ["npm", "run", "start:prod"]
+# The entrypoint applies pending migrations and then execs node, so node is tini's direct child (no npm, no sh).
+# If a migration fails the server never comes up, and a platform health check keeps the previous deploy serving.
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["./docker-entrypoint.sh"]
