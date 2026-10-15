@@ -23,6 +23,8 @@ RUN npm prune --omit=dev
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# The platform ingress targets this port (Azure Container Apps does not inject PORT).
+ENV PORT=3333
 COPY --from=prod-deps --chown=node:node /app/package.json ./package.json
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
