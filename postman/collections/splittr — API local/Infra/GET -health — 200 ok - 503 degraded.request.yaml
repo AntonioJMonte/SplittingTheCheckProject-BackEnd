@@ -1,7 +1,0 @@
-$kind: http-request
-name: GET /health — 200 ok / 503 degraded
-url: "{{baseUrl}}/health"
-method: GET
-auth:
-  type: noauth
-order: 1000

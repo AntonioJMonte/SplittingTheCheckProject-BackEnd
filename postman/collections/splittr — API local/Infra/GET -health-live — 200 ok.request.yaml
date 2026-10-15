@@ -1,0 +1,7 @@
+$kind: http-request
+name: GET /health/live — 200 ok
+url: "{{baseUrl}}/health/live"
+method: GET
+auth:
+  type: noauth
+order: 900

@@ -275,6 +275,33 @@ Veja [`.env.example`](.env.example) para a lista completa. As principais:
 
 Todas são validadas por Zod no startup: uma variável ausente ou malformada derruba o processo antes de servir a primeira requisição.
 
+### Health checks e probes do Azure Container Apps
+
+- `GET /health/live` só confirma que o processo atende HTTP. Não consulta Postgres nem Redis: reiniciar o contêiner não conserta uma dependência fora do ar.
+- `GET /health/ready` checa Postgres e Redis e responde 503 se algum cair. É o healthcheck do `docker compose`.
+
+No Container Apps, a imagem aplica as migrations (`prisma migrate deploy`) antes de abrir a porta, então o startup precisa de folga para isso:
+
+```yaml
+probes:
+  - type: Startup        # libera os outros probes quando passa; ~2 min para o migrate deploy
+    httpGet: { path: /health/ready, port: 3333 }
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 24
+    timeoutSeconds: 3
+  - type: Readiness      # tira a réplica do tráfego enquanto Postgres ou Redis estão fora
+    httpGet: { path: /health/ready, port: 3333 }
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  - type: Liveness       # reinicia só se o processo parar de responder
+    httpGet: { path: /health/live, port: 3333 }
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 3
+```
+
 ---
 
 ## Documentação da API
@@ -302,7 +329,8 @@ A API é auto-documentada via OpenAPI em `/docs` quando o servidor está rodando
 | `GET` | `/groups/:groupId/settlements/compute` | Transferências mínimas (DebtMinimizer) |
 | `POST` | `/groups/:groupId/settlements` | Devedor registra o pagamento; gera copia-e-cola Pix |
 | `PATCH` | `/settlements/:settlementId/acknowledge` | Credor confirma o recebimento |
-| `GET` | `/health` | Estado de Postgres e Redis; 503 se alguma cair |
+| `GET` | `/health/live` | Liveness: o processo atende HTTP; não consulta dependências |
+| `GET` | `/health/ready` | Readiness: estado de Postgres e Redis; 503 se alguma cair |
 
 Os filtros de `GET /groups/:groupId/expenses` são `view` (`all`, `involved`, `paid`, `pending`), `category`, `startDate`, `endDate`, `minAmount`, `maxAmount`, `page` e `limit`.
 

@@ -11,7 +11,7 @@
 - **Domínio:** 6 entidades, 5 VOs (Money, Email, `Phone`, SplitMethod, ExpenseCategory), 2 domain services
   (`DebtMinimizer` guloso O(n log n) e `SplitCalculator` com distribuição de resto).
 - **Aplicação:** 28 use cases + 5 interfaces de repositório + 3 serviços. DIP respeitada.
-- **Infra HTTP:** 29 rotas/controllers (incl. `/health`), 5 arquivos de rotas, error handler central, OpenAPI.
+- **Infra HTTP:** 30 rotas/controllers (incl. `/health/live` e `/health/ready`), 5 arquivos de rotas, error handler central, OpenAPI.
 - **Persistência:** 5 repositórios Prisma; **6 migrations**.
 - **WebSocket:** auth JWT no handshake, rooms, adapter Redis, dedup, 9 eventos de grupo.
 - **Redis:** cache de saldos, cache de categoria, blacklist de refresh tokens e store do rate limit.
@@ -55,7 +55,7 @@
 - **Fase 3 (15/10, projeto compose isolado):** app `healthy`; 544 → 545 MB (tini +0,8 MB; a cópia de `.prisma` removida
   era 4,1 kB); `tini` PID 1 e `node` PID 7 com PPID 1; `compose stop` em 0,68 s, socket aberto recebeu `io server disconnect`,
   logs na ordem sinal → sockets → HTTP → pub/sub → Prisma/cache → concluído, saída 0, sem warn/erro.
-- Já atendidos: `/health` (Postgres + Redis, 503), `0.0.0.0` + `PORT`, CORS do Fastify e do Socket.IO por `CORS_ORIGIN`,
+- Já atendidos: `/health/live` (sem dependências) e `/health/ready` (Postgres + Redis, 503), `0.0.0.0` + `PORT`, CORS do Fastify e do Socket.IO por `CORS_ORIGIN`,
   `rediss://` nos 3 clients (todos leem `REDIS_URL`).
 - **D-107 inviável:** o Fastify 5.12.5 tornou `trustProxy` numérico fail-closed (`lib/request.js`) e tirou `number` dos tipos.
 - **D-108 (revista):** `TRUST_PROXY_HOPS` (inteiro >= 0, padrão 0; 1 no Container Apps) via função de confiança, já que o
@@ -156,7 +156,7 @@ D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite
 - **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
 - **Cookie de refresh entre `*.vercel.app` e `*.azurecontainerapps.io` é de terceiros** (`vercel.app` está na Public Suffix List;
   `azurecontainerapps.io` não): o Safari bloqueia e a sessão cai após 15 min. Domínio próprio para front e API resolve.
-- **`/health` responde 503 com o Redis fora:** a plataforma pode reiniciar o contêiner num soluço do Upstash.
+- **`/health/ready` responde 503 com o Redis fora:** a réplica sai do tráfego, mas não reinicia (o liveness é `/health/live`).
 - **`TRUST_PROXY_HOPS=1` no Container Apps:** confira no log "incoming request" que o `remoteAddress` é o IP do cliente.
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
 - **Fórmula de saldo copiada em 5 use cases** (saldos, compute, confirm, leave, remove). Com o D-99 todas descontam
