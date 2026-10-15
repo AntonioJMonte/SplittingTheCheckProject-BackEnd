@@ -1,7 +1,7 @@
 # Estado do Projeto — Splittr
 
-**Última atualização:** 2026-10-14
-**Branch:** `fix/api-para-o-front` (Fase B do plano do front), a partir de `main` em `79fa35d`
+**Última atualização:** 2026-10-15
+**Branch:** `chore/deploy-readiness` (local, sem push), a partir de `main` em `f25b369`
 **Etapa atual:** 6 — Frontend. Spec, DESIGN e plano (`../splittr-web/docs/plans/frontend-mvp.md`) aprovados em 13/10; front em construção.
 
 ---
@@ -45,22 +45,30 @@
 - **D-99:** `GET /balances` desconta acertos CONFIRMED; cache de saldos invalidado ao adicionar/remover membro, sair e confirmar acerto.
 - **D-105:** a string de dinheiro aceita no máximo 8 dígitos inteiros (até `99999999.99`, o que cabe em `Decimal(10, 2)`); 9 ou mais → 400 em `amount`.
 
-### Prontidão para deploy (checklist de 14/10, não commitado)
-- **D-106:** a imagem roda `npm run start:prod` = `prisma migrate deploy` + servidor; `prisma` foi para `dependencies` e `prisma/`
-  entra no runtime (+~61 MB); o serviço `migrate` do compose saiu. Verificado em contêiner contra schema vazio: 6 migrations,
-  `/health` 200, segundo início sem pendências, `docker stop` em 1 s.
+### Prontidão para deploy — branch `chore/deploy-readiness` (alvo: Azure Container Apps, 1 réplica)
+- **D-106:** migrations na inicialização; `prisma` em `dependencies` e `prisma/` no runtime (+~61 MB); serviço `migrate` do compose saiu.
+- **D-109:** `tini` é o PID 1 e `docker-entrypoint.sh` (`set -e`) migra e faz `exec node`: node é filho direto do tini, sem npm/sh.
+- **Encerramento pelos hooks do Fastify:** `preClose` faz `io.local.disconnectSockets(true)`; `onClose` fecha pub/sub (no
+  `createSocketServer`) e Prisma + cache (no `app.ts`, com `allSettled`). SIGTERM/SIGINT só chamam `app.close()`, com prazo de 10 s.
+- Porta 3333 no schema e `ENV PORT=3333` na imagem; `CORS_ORIGIN` exige origens exatas (`new URL(item).origin === item`, sem `*`);
+  `.dockerignore` com `.env.*`/`src/tests`; compose com `redis:7.4-alpine` e Postgres/Redis só em `127.0.0.1`.
+- **Fase 3 (15/10, projeto compose isolado):** app `healthy`; 544 → 545 MB (tini +0,8 MB; a cópia de `.prisma` removida
+  era 4,1 kB); `tini` PID 1 e `node` PID 7 com PPID 1; `compose stop` em 0,68 s, socket aberto recebeu `io server disconnect`,
+  logs na ordem sinal → sockets → HTTP → pub/sub → Prisma/cache → concluído, saída 0, sem warn/erro.
 - Já atendidos: `/health` (Postgres + Redis, 503), `0.0.0.0` + `PORT`, CORS do Fastify e do Socket.IO por `CORS_ORIGIN`,
   `rediss://` nos 3 clients (todos leem `REDIS_URL`).
-- **D-107 bloqueada:** o Fastify 5.12.5 tornou `trustProxy` numérico fail-closed (`lib/request.js`) e tirou `number` dos tipos. Ver D-108.
+- **D-107 inviável:** o Fastify 5.12.5 tornou `trustProxy` numérico fail-closed (`lib/request.js`) e tirou `number` dos tipos.
+- **D-108 (revista):** `TRUST_PROXY_HOPS` (inteiro >= 0, padrão 0; 1 no Container Apps) via função de confiança, já que o
+  Fastify 5.12 ignora número. O IP vem da direita do `X-Forwarded-For`; o valor forjado à esquerda é ignorado.
 
-## Baseline de qualidade (2026-10-14)
+## Baseline de qualidade (2026-10-15)
 
 | Verificação | Resultado |
 |---|---|
 | `npx tsc --noEmit` | limpo |
-| `npx vitest run` | 529 testes, 73 arquivos, 100% |
-| `npx vitest run --coverage` | 88,2% stmts · 76,06% branch · 81,67% funcs · 88,52% lines (thresholds 84/71/78/84) |
-| `npm run test:integration` | 47 testes, 5 arquivos · `src/infra/database` 97,69 · 89,74 · 100 · 100 (thresholds 96/87/98/98) |
+| `npx vitest run` | 561 testes, 77 arquivos, 100% |
+| `npx vitest run --coverage` | 88,51% stmts · 76,44% branch · 82,24% funcs · 88,84% lines (thresholds 84/71/78/84) |
+| `npm run test:integration` | 46 de 47 em 15/10: falha "5 edições concorrentes" (Unable to start a transaction), igual na `main` `f25b369` |
 | `npm audit` | 0 vulnerabilidades (3 avisos novos de 13/10 corrigidos no D-96) |
 | `/docs/json` | gera 22 paths com as rotas novas (verificado em runtime) |
 
@@ -71,7 +79,7 @@
 ### Frontend
 Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), repositório `SplittingTheCheckProject-FrontEnd`,
 com PRs empilhados por fase (#1 a #13 abertos, até a Fase 8, MVP parcialmente verificado). D-98, D-99, D-100,
-D-104 e D-105 implementadas aqui na Fase B; falta o merge do PR #1.
+D-104 e D-105 implementadas aqui; o PR #1 (Fase B) foi integrado em `008e30c` e a D-105 entrou direto na `main` (`f25b369`).
 
 ### Lacunas encontradas no D-105 (não aprovadas, não feitas)
 - O ramo `number` do `moneyInput` não tem limite: um number acima de 99999999.99 ainda chega ao banco e responde 500.
@@ -81,6 +89,12 @@ D-104 e D-105 implementadas aqui na Fase B; falta o merge do PR #1.
 - `version` **não** vem na resposta do `POST` (criar) nem do `POST .../categorize`: o campo é opcional no
   schema compartilhado. Um cliente que edita logo após criar precisa assumir 0 ou listar de novo.
 - O evento `expense_updated` passou a levar `version`, porque reaproveita o payload do `PATCH` (aditivo).
+
+### Encontrado na prontidão para deploy (15/10, não aprovado, não feito)
+- Volume de dev `redis_data` foi gravado pela Redis 8.10 (RDB 15) e não abre na 7.4: recriar exige apagar o volume (só cache).
+- `pino-pretty` (só dev) e `dayjs` (sem uso no código) estão em `dependencies`; `start:prod` ficou sem uso (o entrypoint migra).
+- Prisma 5.22 não lista Node 22 nem 24 como suportados (Node 22 oficial só a partir do Prisma 6.0.0); a imagem segue em Node 24.
+- Integração: o teste de 5 edições concorrentes falha também na `main`; investigar pool/`maxWait` à parte.
 
 ### Backlog
 Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a categorização (hoje em memória).
@@ -92,7 +106,7 @@ Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a c
 
 | ID | Tema | Situação |
 |----|------|----------|
-| D-108 | Como confiar no proxy da plataforma, já que contar saltos (D-107 B) não funciona no Fastify 5.12.5 | Aguarda escolha (A: faixas confiáveis; B: função própria de saltos) |
+| — | Nenhuma | — |
 
 ## Decisões tomadas
 
@@ -126,6 +140,10 @@ D-105: instrução direta do usuário (sem registro anterior nos repositórios):
 D-106 (A): migrations na inicialização da imagem. D-107 (B): `trustProxy` por contagem de saltos; aprovada, mas inviável no
 Fastify 5.12.5; a escolha volta como D-108.
 
+### 2026-10-15 (D-108, D-109)
+D-108: o usuário pediu contagem de saltos (`TRUST_PROXY_HOPS`); a versão por faixas (A) foi trocada antes de ser commitada.
+D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como processo principal.
+
 ---
 
 ## Riscos e observações
@@ -133,8 +151,10 @@ Fastify 5.12.5; a escolha volta como D-108.
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
 - **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
-- **Cookie de refresh entre `vercel.app` e o domínio da API é de terceiros:** o Safari bloqueia; domínio próprio resolve.
+- **Cookie de refresh entre `*.vercel.app` e `*.azurecontainerapps.io` é de terceiros** (`vercel.app` está na Public Suffix List;
+  `azurecontainerapps.io` não): o Safari bloqueia e a sessão cai após 15 min. Domínio próprio para front e API resolve.
 - **`/health` responde 503 com o Redis fora:** a plataforma pode reiniciar o contêiner num soluço do Upstash.
+- **`TRUST_PROXY_HOPS=1` no Container Apps:** confira no log "incoming request" que o `remoteAddress` é o IP do cliente.
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
 - **Fórmula de saldo copiada em 5 use cases** (saldos, compute, confirm, leave, remove). Com o D-99 todas descontam
   acertos confirmados; mudar uma exige mudar as outras. Cache `grupo:*:saldos` gravado antes do D-99 vive até 24h: apague no Redis de dev.
@@ -158,5 +178,5 @@ Fastify 5.12.5; a escolha volta como D-108.
 
 ## Próximo passo
 
-1. Revisar e integrar o PR de `fix/api-para-o-front` (Fase B).
+1. Revisar e publicar `chore/deploy-readiness` (sem push até aprovação) e decidir os itens "Encontrado na prontidão".
 2. Integrar os PRs do front (#1 a #13) e concluir a verificação do MVP (Fase 8).
