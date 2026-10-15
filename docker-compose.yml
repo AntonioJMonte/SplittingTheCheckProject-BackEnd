@@ -1,8 +1,9 @@
 services:
   postgres:
     image: postgres:16-alpine
+    # Só na máquina local: o banco de dev não fica exposto para a rede.
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_USER: splittr
       POSTGRES_PASSWORD: splittr
@@ -16,9 +17,11 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    # Versão fixa: `redis:alpine` muda de major sem aviso, e um dump gravado por uma versão mais nova não abre
+    # numa mais antiga.
+    image: redis:7.4-alpine
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
