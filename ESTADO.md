@@ -140,7 +140,10 @@ D-106 (A): migrations na inicialização da imagem. D-107 (B): `trustProxy` por 
 Fastify 5.12.5; a escolha volta como D-108.
 
 ### 2026-10-15 (D-108, D-109)
-D-108: o usuário pediu contagem de saltos (`TRUST_PROXY_HOPS`); a versão por faixas (A) foi trocada antes de ser commitada.
+D-108: contagem de saltos (`TRUST_PROXY_HOPS`) por função de confiança; a versão por faixas (A) foi trocada antes do commit.
+  Evidência: `node_modules/fastify/lib/request.js`, `getTrustProxyFn` (l. 51-54): número devolve `() => false` ("Hop-count-only
+  trust cannot validate the immediate peer. Fail closed..."). Premissa: no Container Apps o vizinho imediato é sempre o ingress e
+  a API não é alcançável direto pela internet. Testes cobrem 0, 1 e 2 saltos.
 D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como processo principal.
 D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite da Vercel): volume Redis de dev recriado (o dump da 8.10, RDB 15, não abre na 7.4; só cache) e contêiner órfão `migrate` removido.
 

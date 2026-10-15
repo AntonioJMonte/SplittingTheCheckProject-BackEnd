@@ -33,7 +33,9 @@ z.config(z.locales.pt())
 
 // D-108: confia nos N vizinhos mais próximos e pega o IP logo antes deles, o mais à direita que o cliente não
 // escreve. Nunca `true`, que usaria o primeiro valor do X-Forwarded-For, forjável pelo cliente. Função e não
-// número porque o Fastify 5.12 ignora `trustProxy` numérico; o efeito é o que o número fazia antes.
+// número porque o Fastify 5.12 faz o número falhar fechado de propósito (getTrustProxyFn em
+// node_modules/fastify/lib/request.js: "Hop-count-only trust cannot validate the immediate peer").
+// Premissa: no Container Apps o vizinho imediato é sempre o ingress e a API não é alcançável direto pela internet.
 const trustedHops = env.TRUST_PROXY_HOPS
 
 export const app = fastify({
