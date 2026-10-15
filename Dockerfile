@@ -28,7 +28,6 @@ ENV NODE_ENV=production
 ENV PORT=3333
 COPY --from=prod-deps --chown=node:node /app/package.json ./package.json
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
 # D-106: the Prisma CLI is a production dependency, so `migrate deploy` runs here with the schema and migrations.
 COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
