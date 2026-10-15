@@ -10,8 +10,10 @@ import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from '@fas
 import { z, ZodError } from 'zod'
 import { DomainError } from '../../shared/errors/domain-error'
 import { DomainPermissionError } from '../../shared/errors/domain-permission-error'
+import { prisma } from '../database/prisma/prismaClient'
 import { env } from '../env'
 import { logger } from '../logger/logger'
+import { closeRedisClient } from '../redis/redis-client'
 import { globalRateLimitOptions } from './rate-limit'
 import {
   VALIDATION_ERROR_MESSAGE,
@@ -29,7 +31,17 @@ import { healthRoutes } from './routes/healthRoutes'
 // todo schema avaliado depois desta linha.
 z.config(z.locales.pt())
 
-export const app = fastify({ loggerInstance: logger })
+// D-108: confia nos N vizinhos mais próximos e pega o IP logo antes deles, o mais à direita que o cliente não
+// escreve. Nunca `true`, que usaria o primeiro valor do X-Forwarded-For, forjável pelo cliente. Função e não
+// número porque o Fastify 5.12 faz o número falhar fechado de propósito (getTrustProxyFn em
+// node_modules/fastify/lib/request.js: "Hop-count-only trust cannot validate the immediate peer").
+// Premissa: no Container Apps o vizinho imediato é sempre o ingress e a API não é alcançável direto pela internet.
+const trustedHops = env.TRUST_PROXY_HOPS
+
+export const app = fastify({
+  loggerInstance: logger,
+  trustProxy: trustedHops > 0 ? (_address: string, hop: number) => hop < trustedHops : false,
+})
 
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
@@ -140,6 +152,18 @@ app.register(groupRoutes)
 app.register(expenseRoutes)
 app.register(settlementRoutes)
 app.register(healthRoutes)
+
+// Quem cria, fecha: o Prisma e o client Redis de cache servem às rotas deste app. onClose roda depois do
+// server.close(), sem requisição em andamento; allSettled para a falha de um não deixar o outro aberto.
+app.addHook('onClose', async () => {
+  const results = await Promise.allSettled([prisma.$disconnect(), closeRedisClient()])
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      app.log.error({ err: result.reason, dependency: index === 0 ? 'prisma' : 'redis-cache' }, 'Encerramento: falha ao fechar')
+    }
+  })
+  app.log.info('Encerramento: Prisma e client Redis de cache fechados')
+})
 
 app.setErrorHandler((error, request, reply) => {
   if (error instanceof ZodError) {

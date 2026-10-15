@@ -1,14 +1,11 @@
 import type { CookieSerializeOptions } from '@fastify/cookie'
-import { env } from '../env'
 
-// D-59: um frontend em outro domínio só recebe e reenvia este cookie com SameSite=None, que o
-// navegador exige acompanhado de Secure. Fora de produção API e frontend ficam ambos em
-// localhost — mesmo site, portas diferentes — então Lax basta e preserva a defesa contra CSRF.
-// As mesmas opções valem na limpeza: em requisição cross-site o navegador descarta um
-// Set-Cookie que não venha com SameSite=None, e o logout deixaria o cookie para trás.
+// D-110 (substitui a D-59): o front chama a API pelo rewrite /api/* da Vercel, no mesmo site, então este cookie é
+// first-party em qualquer ambiente, e Lax recupera a defesa contra CSRF que o None abria mão. O Socket.IO não usa
+// o cookie: autentica pelo token no handshake (D-60). As mesmas opções valem na limpeza, no logout.
 export const refreshTokenCookieOptions: CookieSerializeOptions = {
   path: '/',
   httpOnly: true,
   secure: true,
-  sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
+  sameSite: 'lax',
 }

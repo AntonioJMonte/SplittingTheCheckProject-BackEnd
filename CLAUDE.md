@@ -113,6 +113,7 @@ Estrutura:
 - Aritmética monetária SEMPRE com decimal.js, nunca float
 - Variáveis de ambiente validadas com Zod no startup
 - Testes unitários para domain services e use cases
+- Sempre ler um arquivo existente antes de sobrescrevê-lo
 
 ## Convenções de código
 - TypeScript strict mode

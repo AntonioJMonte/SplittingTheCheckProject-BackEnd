@@ -32,7 +32,7 @@ describe('CORS (D-58)', () => {
     })
 
     it('devolve o header de origem em uma requisição simples da allowlist', async () => {
-        const res = await app.inject({ method: 'GET', url: '/health', headers: { origin: ALLOWED } })
+        const res = await app.inject({ method: 'GET', url: '/health/live', headers: { origin: ALLOWED } })
 
         expect(res.statusCode).toBe(200)
         expect(res.headers['access-control-allow-origin']).toBe(ALLOWED)
@@ -48,7 +48,7 @@ describe('CORS (D-58)', () => {
 
         expect(preflight.headers['access-control-allow-origin']).toBeUndefined()
 
-        const simple = await app.inject({ method: 'GET', url: '/health', headers: { origin: DENIED } })
+        const simple = await app.inject({ method: 'GET', url: '/health/live', headers: { origin: DENIED } })
 
         // Sem o header o navegador bloqueia a leitura da resposta, mesmo com status 200.
         expect(simple.statusCode).toBe(200)
@@ -58,7 +58,7 @@ describe('CORS (D-58)', () => {
     it('não reflete a origem quando ela não é a exata da allowlist', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/health',
+            url: '/health/live',
             headers: { origin: 'http://localhost:5174' },
         })
 

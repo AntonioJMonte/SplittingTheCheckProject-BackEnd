@@ -1,0 +1,2 @@
+# Scripts de shell rodam no Linux da imagem: com CRLF, o "#!/bin/sh\r" não é encontrado.
+*.sh text eol=lf

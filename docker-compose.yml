@@ -1,8 +1,9 @@
 services:
   postgres:
     image: postgres:16-alpine
+    # Só na máquina local: o banco de dev não fica exposto para a rede.
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_USER: splittr
       POSTGRES_PASSWORD: splittr
@@ -16,31 +17,19 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    # Major fixa (a 8, que já estava em uso): `redis:alpine` muda de major sem aviso. Sem volume e sem snapshot
+    # (`--save ''`): é só cache, e um dump gravado por uma versão não precisa abrir em outra.
+    image: redis:8-alpine
     ports:
-      - '6379:6379'
-    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
+      - '127.0.0.1:6379:6379'
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --save ''
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Roda uma vez e sai; o app só sobe se as migrations terminarem com sucesso.
-  migrate:
-    build:
-      context: .
-      target: build
-    command: ['npx', 'prisma', 'migrate', 'deploy']
-    environment:
-      DATABASE_URL: postgresql://splittr:splittr@postgres:5432/splittr_db?schema=public
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: 'no'
-
+  # D-106: a própria imagem aplica as migrations ao iniciar, como faria numa plataforma de um contêiner só.
   app:
     build:
       context: .
@@ -59,17 +48,16 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3333/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3333/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -77,4 +65,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:

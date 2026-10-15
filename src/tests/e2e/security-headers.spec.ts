@@ -12,7 +12,7 @@ afterAll(async () => {
 
 describe('Headers de segurança (D-66)', () => {
     it('envia os headers do helmet em uma resposta comum', async () => {
-        const res = await app.inject({ method: 'GET', url: '/health' })
+        const res = await app.inject({ method: 'GET', url: '/health/live' })
 
         expect(res.statusCode).toBe(200)
         expect(res.headers['x-content-type-options']).toBe('nosniff')
@@ -22,7 +22,7 @@ describe('Headers de segurança (D-66)', () => {
     })
 
     it('define um CSP que proíbe enquadrar a API e carregar plugins', async () => {
-        const res = await app.inject({ method: 'GET', url: '/health' })
+        const res = await app.inject({ method: 'GET', url: '/health/live' })
         const csp = res.headers['content-security-policy'] as string
 
         expect(csp).toContain("default-src 'self'")

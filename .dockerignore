@@ -4,4 +4,7 @@ coverage
 .claude
 .git
 .env
+.env.*
+!.env.example
 *.log
+src/tests

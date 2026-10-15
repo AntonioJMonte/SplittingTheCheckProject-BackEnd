@@ -1,118 +1,95 @@
 # Estado do Projeto — Splittr
 
-**Última atualização:** 2026-10-13
-**Branch:** `fix/api-para-o-front` (Fase B do plano do front), a partir de `main` em `79fa35d`
+**Última atualização:** 2026-10-15
+**Branch:** `chore/deploy-readiness` (local, sem push), a partir de `main` em `f25b369`
 **Etapa atual:** 6 — Frontend. Spec, DESIGN e plano (`../splittr-web/docs/plans/frontend-mvp.md`) aprovados em 13/10; front em construção.
 
----
+Histórico concluído (Etapa 5, API para o front, Fase B, detalhes da prontidão e decisões D-01…D-107): `docs/historico.md`.
 
 ## Concluído (confirmado no código em 13/10)
 
 - **Domínio:** 6 entidades, 5 VOs (Money, Email, `Phone`, SplitMethod, ExpenseCategory), 2 domain services
   (`DebtMinimizer` guloso O(n log n) e `SplitCalculator` com distribuição de resto).
 - **Aplicação:** 28 use cases + 5 interfaces de repositório + 3 serviços. DIP respeitada.
-- **Infra HTTP:** 29 rotas/controllers (incl. `/health`), 5 arquivos de rotas, error handler central, OpenAPI.
+- **Infra HTTP:** 30 rotas/controllers (incl. `/health/live` e `/health/ready`), 5 arquivos de rotas, error handler central, OpenAPI.
 - **Persistência:** 5 repositórios Prisma; **6 migrations**.
 - **WebSocket:** auth JWT no handshake, rooms, adapter Redis, dedup, 9 eventos de grupo.
 - **Redis:** cache de saldos, cache de categoria, blacklist de refresh tokens e store do rate limit.
 - **LLM (2.1):** regras → cache → `claude-haiku-4-5` → "Outros". Validado em runtime em 26/09; testes 100% mockados.
-- **Etapas 2–4:** lock otimista em `Settlement`, Docker, logging pino, Swagger detalhado,
-  `SplitCalculator` (D-57), cobertura com thresholds que falham o build.
+- **Etapas 2–5, API para o front (D-88…D-93) e Fase B (D-98…D-105):** concluídas e na `main`; detalhes no histórico.
+- **Prontidão para deploy (esta branch, alvo Azure Container Apps, 1 réplica):** migrate na inicialização (D-106), tini +
+  entrypoint (D-109), encerramento pelos hooks do Fastify, IP por saltos (D-108), porta 3333, CORS exato, health live/ready,
+  cookie `Lax` (D-110) e compose com Redis 8 sem volume. Verificação da Fase 3 no histórico.
 
-### Etapa 5 — concluída e commitada
-| Entrega | Decisões | Commit |
-|---|---|---|
-| CORS, Redis resiliente, helmet, rate limit, bcrypt 12, Swagger fora de produção | D-58…D-62, D-66…D-70 | `cc59d3b`…`d100475` |
-| Convite por email/telefone, soft delete, 403, auditoria de despesa | D-71…D-82 | `f40a9ab`…`7f3a816` |
-| README + LICENSE; 0 vulnerabilidades, auth em `preValidation`, Postman | D-63, D-64, D-83, D-84 | `0ac392d`, `ff1a921` |
-| Bloco 4: integração dos 5 repositórios, socket server, caches, bcrypt injetável, bug do `findByUserId` | D-85…D-87 | `86b79e4`…`4761f12` |
-
-### API para o frontend — commitada (`dc1ff53`, `826b98e`)
-- **D-88:** `GET /users/me` → `{ user: { id, name, email, phone, pixKey } }`.
-- **D-89:** `GET /groups/:groupId/settlements?status=` (mais recentes primeiro); `Settlement` ganhou `createdAt`.
-- **D-90:** todo erro de validação responde `{ message: 'Dados inválidos.', issues: [{ path, message }] }`,
-  com caminho pontuado e mensagens do Zod em português (`z.locales.pt()`).
-- **D-91:** `/refresh` saiu do limite de 5/min; fica no global de 100/min.
-- **D-92:** `version` obrigatório no `PATCH /expenses/:id`; diferente da atual → 409. Listagem e resposta do
-  `PATCH` trazem `version`. Fecha o risco do D-82 (cliente com tela velha).
-- **D-93:** `GET /expenses/:expenseId/revisions` com `editedBy: { userId, name }`, inclusive de quem saiu.
-- Postman: `version` no `PATCH`, 3 requests novos, script que salva o `settlementId` pendente.
-
-### Contrato do back para o front — Fase B (branch `fix/api-para-o-front`, um commit por decisão)
-- **D-104:** login e cadastro respondem em português ("Email ou senha incorretos.", "Já existe uma conta com este email.").
-- **D-100:** `GET /groups/:id` e `/members` trazem `userId` em cada membro.
-- **D-98 (+P-8):** `amount` de despesa (criar e editar), partes e acerto aceitam string decimal com até 2 casas, além de number.
-- **D-99:** `GET /balances` desconta acertos CONFIRMED; cache de saldos invalidado ao adicionar/remover membro, sair e confirmar acerto.
-
-## Baseline de qualidade (2026-10-13)
+## Baseline de qualidade (2026-10-15)
 
 | Verificação | Resultado |
 |---|---|
 | `npx tsc --noEmit` | limpo |
-| `npx vitest run` | 526 testes, 73 arquivos, 100% |
-| `npx vitest run --coverage` | 88,07% stmts · 75,75% branch · 81,16% funcs · 88,45% lines (thresholds 84/71/78/84) |
-| `npm run test:integration` | 47 testes, 5 arquivos · `src/infra/database` 97,69 · 89,74 · 100 · 100 (thresholds 96/87/98/98) |
+| `npx vitest run` | 563 testes, 77 arquivos, 100% |
+| `npx vitest run --coverage` | 88,53% stmts · 76,37% branch · 82,28% funcs · 88,86% lines (thresholds 84/71/78/84) |
+| `npm run test:integration` | 46 de 47: falha "5 edições concorrentes"; causa ambiental, ver Pendências (correção aguardando aprovação) |
 | `npm audit` | 0 vulnerabilidades (3 avisos novos de 13/10 corrigidos no D-96) |
 | `/docs/json` | gera 22 paths com as rotas novas (verificado em runtime) |
-
----
 
 ## Pendências
 
 ### Frontend
 Mora em `C:\dev\Projeto Rachamento de Contas\splittr-web` (D-97), repositório `SplittingTheCheckProject-FrontEnd`,
-com PRs empilhados por fase. D-98, D-99, D-100 e D-104 implementadas aqui na Fase B; falta o merge do PR.
+com PRs empilhados por fase (#1 a #13 abertos, até a Fase 8, MVP parcialmente verificado). D-98, D-99, D-100,
+D-104 e D-105 implementadas aqui; o PR #1 (Fase B) foi integrado em `008e30c` e a D-105 entrou direto na `main` (`f25b369`).
+
+### Lacunas encontradas no D-105 (não aprovadas, não feitas)
+- O ramo `number` do `moneyInput` não tem limite: um number acima de 99999999.99 ainda chega ao banco e responde 500.
+- O `toApiAmount` do front aceita mais de 8 dígitos inteiros; a API devolve 400 com a mensagem no campo `amount`.
 
 ### Lacunas pequenas encontradas no D-92 (não aprovadas, não feitas)
 - `version` **não** vem na resposta do `POST` (criar) nem do `POST .../categorize`: o campo é opcional no
   schema compartilhado. Um cliente que edita logo após criar precisa assumir 0 ou listar de novo.
 - O evento `expense_updated` passou a levar `version`, porque reaproveita o payload do `PATCH` (aditivo).
 
+### Encontrado na prontidão para deploy (15/10, não aprovado, não feito)
+- **Integração (5 edições concorrentes):** cada conexão nova via `localhost` leva ~2 s, porque o engine do Prisma tenta `::1`
+  primeiro e o compose publica o Postgres só em `127.0.0.1` desde `357c094`. As transações interativas que precisam de conexão
+  nova estouram o `maxWait` de 2 s. O CAS está correto (com `127.0.0.1`: 1 vence e 4 perdem por versão). Correção proposta.
+
 ### Backlog
 Deploy, CI (não existe `.github/`), linter, vídeo demo. Fila durável para a categorização (hoje em memória).
 `categorySource` (D-08 B). Refresh tokens persistidos (D-34 B). Auditoria de grupo/membro (D-80 cobriu só despesa).
-
----
 
 ## Decisões pendentes
 
 | ID | Tema | Situação |
 |----|------|----------|
-| — | Nenhuma | — |
+| — | Correção da falha de integração (IPv6 do `localhost` × compose em `127.0.0.1`) | Proposta, aguardando aprovação |
 
 ## Decisões tomadas
 
-### Etapas 2–4 (D-01…D-57)
-Ver git log. Exceções à opção A: **D-09** (B), **D-23** (B), **D-35** (B), **D-39** (B), **D-48** (B),
-**D-50** (B), **D-54** (B), **D-55** (C).
+D-01…D-107: `docs/historico.md`.
 
-### Etapa 5 — 2026-09-26 (D-58…D-82)
-Todas na opção **A**, exceto **D-59** (C — `sameSite` derivado de `NODE_ENV`), **D-72** (C — soft
-delete com `deletedBy`) e **D-73** (B — `Expense` e `Member`).
-
-### 2026-10-03 (D-63…D-93)
-Todas na opção **A**, exceto **D-63** (B — `preValidation`; a A, `onRequest`, foi aprovada e revertida antes de
-implementar: tiraria anônimos do rate limit), **D-90** (B — `issues` + Zod em português) e **D-91** (B — `/refresh`
-no limite global). **D-65** descartada.
-
-### 2026-10-13 (D-94…D-96)
-Todas na opção **A**: regra do CLAUDE.md passa a permitir que o domínio importe `src/shared`, `decimal.js` e
-`node:crypto` (D-94); `CLAUDE.MD` renomeado para `CLAUDE.md` no git (D-95); `npm audit fix` atualizou
-`fast-jwt` 6.3.4, `fast-copy` 4.1.2 e `source-map-js` 1.2.2, só no lock (D-96).
-
-### 2026-10-13 — frontend (D-97…D-104)
-Todas na opção **A**: front em repositório próprio, pasta irmã (D-97); valores monetários aceitos como string
-nas requisições, além de number (D-98); saldos descontam acertos CONFIRMED e o cache é invalidado em
-membro/saída/acerto (D-99); `userId` nos membros (D-100); refresh automático no front (D-101); diálogo de chave
-Pix (D-102); sem `leave_group` (D-103); mensagens de login e cadastro traduzidas para português (D-104). P-8 (D-98
-também no `PATCH` de despesa) aprovada com o plano do front.
-
----
+### 2026-10-15 (D-108…D-112)
+D-108: contagem de saltos (`TRUST_PROXY_HOPS`) por função de confiança; a versão por faixas (A) foi trocada antes do commit.
+  Evidência: `node_modules/fastify/lib/request.js`, `getTrustProxyFn` (l. 51-54): número devolve `() => false` ("Hop-count-only
+  trust cannot validate the immediate peer. Fail closed..."). Premissa: no Container Apps o vizinho imediato é sempre o ingress e
+  a API não é alcançável direto pela internet. Testes cobrem 0, 1 e 2 saltos.
+D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como processo principal.
+D-110: front na Vercel com rewrite `/api/*` → API; Socket.IO direto na Azure, autenticado por token (D-60). Cookie de refresh
+  com `SameSite=Lax` também em produção (first-party pelo rewrite), substituindo a D-59.
+D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite da Vercel): volume Redis de dev recriado (o dump da 8.10, RDB 15, não abre na 7.4; só cache) e contêiner órfão `migrate` removido.
+D-112: Node 24 + Prisma 5.22, combinação sem suporte oficial (o Prisma 5 só lista até o Node 20, que está em EOL; o Node 22
+  só é oficial a partir do Prisma 6.0.0). Testada e funcional na imagem; upgrade para o Prisma 6 planejado após o primeiro deploy.
 
 ## Riscos e observações
 
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
+- **`docker compose up -d` reaproveita a imagem velha do app:** depois de mexer no Dockerfile ou no código, use `--build`.
+- **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
+- **Limitação aceita (D-110): pelo rewrite, o rate limit vê o IP da Vercel** nas chamadas REST, então o limite de `/auth` (5/min)
+  fica compartilhado entre todos. Correção futura: header secreto da Vercel + `x-real-ip`.
+- **O cookie `Lax` só funciona com o rewrite no ar (D-110):** chamando a API direto de `*.vercel.app`, o refresh deixa de ir.
+- **`/health/ready` responde 503 com o Redis fora:** a réplica sai do tráfego, mas não reinicia (o liveness é `/health/live`).
+- **`TRUST_PROXY_HOPS=1` no Container Apps:** confira no log "incoming request" que o `remoteAddress` é o IP do cliente.
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.
 - **Fórmula de saldo copiada em 5 use cases** (saldos, compute, confirm, leave, remove). Com o D-99 todas descontam
   acertos confirmados; mudar uma exige mudar as outras. Cache `grupo:*:saldos` gravado antes do D-99 vive até 24h: apague no Redis de dev.
@@ -123,7 +100,7 @@ também no `PATCH` de despesa) aprovada com o plano do front.
 - **`EnvironmentTeardownError` intermitente** do Vitest já derrubou o `test:coverage`; não reproduziu em 03/10.
 - **Rodar um spec de integração sozinho reprova a catraca** (D-86). Use `--coverage.enabled=false`.
 - **Relatório principal mostra repositórios em ~0%** de propósito: lá são mockados; a medida real é a da integração.
-- **Thresholds do relatório principal** seguem 84/71/78/84 com o medido em ~88/76/81/88: dá para subir.
+- **Thresholds do relatório principal** seguem 84/71/78/84 com o medido em ~88/76/82/88: dá para subir.
 - **Depois de `git pull` que mexe no lock, rode `npm ci`:** em 13/10 o `node_modules` velho derrubou `tsc` e um spec.
 - **Rate limit pendura o hook na rota** (`onRoute`): auth em `onRequest` escaparia dele (D-63).
 - **Vitest avisa "ESM syntax in a file loaded as CommonJS"** nos configs; roda normalmente.
@@ -136,5 +113,5 @@ também no `PATCH` de despesa) aprovada com o plano do front.
 
 ## Próximo passo
 
-1. Revisar e integrar o PR de `fix/api-para-o-front` (Fase B).
-2. O front segue a partir da Fase 4 (codegen contra o `/docs/json` com a Fase B).
+1. Aprovar a correção da falha de integração; depois, revisar e publicar `chore/deploy-readiness` (sem push até aprovação).
+2. Integrar os PRs do front (#1 a #13) e concluir a verificação do MVP (Fase 8).

@@ -1,9 +1,10 @@
 import 'dotenv/config'
 import { z } from 'zod'
+import { isExactOrigin } from './cors-origins'
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(3333),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
@@ -20,8 +21,14 @@ const envSchema = z.object({
     .transform(value => value.split(',').map(origin => origin.trim()).filter(Boolean))
     .refine(origins => origins.length > 0, {
       message: 'precisa listar ao menos uma origem (separadas por vírgula)',
+    })
+    .refine(origins => origins.every(isExactOrigin), {
+      message: 'cada origem precisa ser exata, como https://app.vercel.app: sem barra final, caminho, espaço ou curinga',
     }),
   ANTHROPIC_API_KEY: z.string().optional().transform(value => value || undefined),
+  // D-108: quantos proxies ficam entre o cliente e a API (1 no ingress do Azure Container Apps, que acrescenta o
+  // IP do cliente ao X-Forwarded-For). O IP resolvido é o que o rate limit conta; 0 desliga.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
 })
 
 const parsed = envSchema.safeParse(process.env)
