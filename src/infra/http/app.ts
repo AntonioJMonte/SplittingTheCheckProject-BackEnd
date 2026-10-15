@@ -29,7 +29,15 @@ import { healthRoutes } from './routes/healthRoutes'
 // todo schema avaliado depois desta linha.
 z.config(z.locales.pt())
 
-export const app = fastify({ loggerInstance: logger })
+// D-108: confia nos N vizinhos mais próximos e pega o IP logo antes deles, o mais à direita que o cliente não
+// escreve. Nunca `true`, que usaria o primeiro valor do X-Forwarded-For, forjável pelo cliente. Função e não
+// número porque o Fastify 5.12 ignora `trustProxy` numérico; o efeito é o que o número fazia antes.
+const trustedHops = env.TRUST_PROXY_HOPS
+
+export const app = fastify({
+  loggerInstance: logger,
+  trustProxy: trustedHops > 0 ? (_address: string, hop: number) => hop < trustedHops : false,
+})
 
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)

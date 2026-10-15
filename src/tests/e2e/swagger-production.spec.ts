@@ -14,6 +14,7 @@ async function productionApp() {
             JWT_REFRESH_EXPIRES_IN: '7d',
             LOG_LEVEL: 'silent',
             CORS_ORIGIN: ['http://localhost:5173'],
+            TRUST_PROXY_HOPS: 0,
             DATABASE_URL: 'postgresql://x',
             REDIS_URL: 'redis://x',
         },

@@ -22,6 +22,9 @@ const envSchema = z.object({
       message: 'precisa listar ao menos uma origem (separadas por vírgula)',
     }),
   ANTHROPIC_API_KEY: z.string().optional().transform(value => value || undefined),
+  // D-108: quantos proxies ficam entre o cliente e a API (1 no ingress do Azure Container Apps, que acrescenta o
+  // IP do cliente ao X-Forwarded-For). O IP resolvido é o que o rate limit conta; 0 desliga.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
 })
 
 const parsed = envSchema.safeParse(process.env)

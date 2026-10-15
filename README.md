@@ -268,6 +268,7 @@ Veja [`.env.example`](.env.example) para a lista completa. As principais:
 | `JWT_SECRET` | Secret para assinatura de tokens (mínimo 32 caracteres) |
 | `JWT_REFRESH_SECRET` | Secret para refresh tokens (mínimo 32 caracteres) |
 | `CORS_ORIGIN` | Origens permitidas, separadas por vírgula |
+| `TRUST_PROXY_HOPS` | Proxies entre o cliente e a API, para o IP do rate limit (padrão 0; 1 no Azure Container Apps) |
 | `ANTHROPIC_API_KEY` | Chave da API Anthropic (opcional) |
 | `LOG_LEVEL` | Nível do pino (padrão `info`) |
 | `PORT` | Porta do servidor (padrão 3333) |
