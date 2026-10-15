@@ -17,14 +17,12 @@ services:
       retries: 5
 
   redis:
-    # Versão fixa: `redis:alpine` muda de major sem aviso, e um dump gravado por uma versão mais nova não abre
-    # numa mais antiga.
-    image: redis:7.4-alpine
+    # Major fixa (a 8, que já estava em uso): `redis:alpine` muda de major sem aviso. Sem volume e sem snapshot
+    # (`--save ''`): é só cache, e um dump gravado por uma versão não precisa abrir em outra.
+    image: redis:8-alpine
     ports:
       - '127.0.0.1:6379:6379'
-    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --save ''
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -67,4 +65,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:

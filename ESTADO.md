@@ -51,7 +51,7 @@
 - **Encerramento pelos hooks do Fastify:** `preClose` faz `io.local.disconnectSockets(true)`; `onClose` fecha pub/sub (no
   `createSocketServer`) e Prisma + cache (no `app.ts`, com `allSettled`). SIGTERM/SIGINT só chamam `app.close()`, com prazo de 10 s.
 - Porta 3333 no schema e `ENV PORT=3333` na imagem; `CORS_ORIGIN` exige origens exatas (`new URL(item).origin === item`, sem `*`);
-  `.dockerignore` com `.env.*`/`src/tests`; compose com `redis:7.4-alpine` e Postgres/Redis só em `127.0.0.1`.
+  `.dockerignore` com `.env.*`/`src/tests`; compose com `redis:8-alpine` sem volume nem snapshot (`--save ''`) e Postgres/Redis só em `127.0.0.1`.
 - **Fase 3 (15/10, projeto compose isolado):** app `healthy`; 544 → 545 MB (tini +0,8 MB; a cópia de `.prisma` removida
   era 4,1 kB); `tini` PID 1 e `node` PID 7 com PPID 1; `compose stop` em 0,68 s, socket aberto recebeu `io server disconnect`,
   logs na ordem sinal → sockets → HTTP → pub/sub → Prisma/cache → concluído, saída 0, sem warn/erro.
