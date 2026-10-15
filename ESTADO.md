@@ -113,7 +113,7 @@ Ver git log. Exceções à opção A: **D-09** (B), **D-23** (B), **D-35** (B), 
 **D-50** (B), **D-54** (B), **D-55** (C).
 
 ### Etapa 5 — 2026-09-26 (D-58…D-82)
-Todas na opção **A**, exceto **D-59** (C — `sameSite` derivado de `NODE_ENV`), **D-72** (C — soft
+Todas na opção **A**, exceto **D-59** (C — `sameSite` derivado de `NODE_ENV`; substituída pela D-110), **D-72** (C — soft
 delete com `deletedBy`) e **D-73** (B — `Expense` e `Member`).
 
 ### 2026-10-03 (D-63…D-93)
@@ -138,12 +138,14 @@ D-105: instrução direta do usuário (sem registro anterior nos repositórios):
 D-106 (A): migrations na inicialização da imagem. D-107 (B): `trustProxy` por contagem de saltos; aprovada, mas inviável no
 Fastify 5.12.5; a escolha volta como D-108.
 
-### 2026-10-15 (D-108, D-109)
+### 2026-10-15 (D-108…D-111)
 D-108: contagem de saltos (`TRUST_PROXY_HOPS`) por função de confiança; a versão por faixas (A) foi trocada antes do commit.
   Evidência: `node_modules/fastify/lib/request.js`, `getTrustProxyFn` (l. 51-54): número devolve `() => false` ("Hop-count-only
   trust cannot validate the immediate peer. Fail closed..."). Premissa: no Container Apps o vizinho imediato é sempre o ingress e
   a API não é alcançável direto pela internet. Testes cobrem 0, 1 e 2 saltos.
 D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como processo principal.
+D-110: front na Vercel com rewrite `/api/*` → API; Socket.IO direto na Azure, autenticado por token (D-60). Cookie de refresh
+  com `SameSite=Lax` também em produção (first-party pelo rewrite), substituindo a D-59.
 D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite da Vercel): volume Redis de dev recriado (o dump da 8.10, RDB 15, não abre na 7.4; só cache) e contêiner órfão `migrate` removido.
 
 ---
@@ -154,8 +156,9 @@ D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
 - **`docker compose up -d` reaproveita a imagem velha do app:** depois de mexer no Dockerfile ou no código, use `--build`.
 - **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
-- **Cookie de refresh entre `*.vercel.app` e `*.azurecontainerapps.io` é de terceiros** (`vercel.app` está na Public Suffix List;
-  `azurecontainerapps.io` não): o Safari bloqueia e a sessão cai após 15 min. Domínio próprio para front e API resolve.
+- **Limitação aceita (D-110): pelo rewrite, o rate limit vê o IP da Vercel** nas chamadas REST, então o limite de `/auth` (5/min)
+  fica compartilhado entre todos. Correção futura: header secreto da Vercel + `x-real-ip`.
+- **O cookie `Lax` só funciona com o rewrite no ar (D-110):** chamando a API direto de `*.vercel.app`, o refresh deixa de ir.
 - **`/health/ready` responde 503 com o Redis fora:** a réplica sai do tráfego, mas não reinicia (o liveness é `/health/live`).
 - **`TRUST_PROXY_HOPS=1` no Container Apps:** confira no log "incoming request" que o `remoteAddress` é o IP do cliente.
 - **`GET .../settlements/compute` emite `settlement_computed`** para a sala: GET com efeito colateral.

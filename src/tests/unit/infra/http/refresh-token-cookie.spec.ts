@@ -9,24 +9,19 @@ async function loadOptions(nodeEnv: string) {
     return refreshTokenCookieOptions
 }
 
-describe('refreshTokenCookieOptions (D-59)', () => {
+describe('refreshTokenCookieOptions (D-110)', () => {
     afterEach(() => {
         vi.doUnmock('../../../../infra/env')
         vi.resetModules()
     })
 
-    it('usa SameSite=None em produção, para o cookie sobreviver a um frontend cross-site', async () => {
-        const options = await loadOptions('production')
-
-        expect(options.sameSite).toBe('none')
-        // None sem Secure é recusado pelo navegador.
-        expect(options.secure).toBe(true)
-    })
-
-    it.each(['development', 'test'])('usa SameSite=Lax em %s', async nodeEnv => {
+    // D-110 substitui a D-59: pelo rewrite /api/* da Vercel o front e a API ficam no mesmo site, então o cookie é
+    // first-party também em produção, e Lax recupera a defesa contra CSRF que o None abria mão.
+    it.each(['production', 'development', 'test'])('usa SameSite=Lax e Secure em %s', async nodeEnv => {
         const options = await loadOptions(nodeEnv)
 
         expect(options.sameSite).toBe('lax')
+        expect(options.secure).toBe(true)
     })
 
     it('mantém o cookie httpOnly e no escopo da raiz em qualquer ambiente', async () => {
