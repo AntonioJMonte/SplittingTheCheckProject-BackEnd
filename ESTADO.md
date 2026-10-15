@@ -91,7 +91,6 @@ D-104 e D-105 implementadas aqui; o PR #1 (Fase B) foi integrado em `008e30c` e 
 - O evento `expense_updated` passou a levar `version`, porque reaproveita o payload do `PATCH` (aditivo).
 
 ### Encontrado na prontidão para deploy (15/10, não aprovado, não feito)
-- Volume de dev `redis_data` foi gravado pela Redis 8.10 (RDB 15) e não abre na 7.4: recriar exige apagar o volume (só cache).
 - `pino-pretty` (só dev) e `dayjs` (sem uso no código) estão em `dependencies`; `start:prod` ficou sem uso (o entrypoint migra).
 - Prisma 5.22 não lista Node 22 nem 24 como suportados (Node 22 oficial só a partir do Prisma 6.0.0); a imagem segue em Node 24.
 - Integração: o teste de 5 edições concorrentes falha também na `main`; investigar pool/`maxWait` à parte.
@@ -143,6 +142,7 @@ Fastify 5.12.5; a escolha volta como D-108.
 ### 2026-10-15 (D-108, D-109)
 D-108: o usuário pediu contagem de saltos (`TRUST_PROXY_HOPS`); a versão por faixas (A) foi trocada antes de ser commitada.
 D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como processo principal.
+D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite da Vercel): volume Redis de dev recriado (o dump da 8.10, RDB 15, não abre na 7.4; só cache) e contêiner órfão `migrate` removido.
 
 ---
 
@@ -150,6 +150,7 @@ D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como 
 
 - **Auditoria cobre só despesa** (D-80). Grupo, membro e acerto não registram edições.
 - **Membro removido continua na sala do socket** até desconectar: não existe `leave_group` (D-103).
+- **`docker compose up -d` reaproveita a imagem velha do app:** depois de mexer no Dockerfile ou no código, use `--build`.
 - **Deploy com uma instância só:** com 2+, o polling do Socket.IO exige sticky sessions ou `transports: ['websocket']`.
 - **Cookie de refresh entre `*.vercel.app` e `*.azurecontainerapps.io` é de terceiros** (`vercel.app` está na Public Suffix List;
   `azurecontainerapps.io` não): o Safari bloqueia e a sessão cai após 15 min. Domínio próprio para front e API resolve.
