@@ -91,7 +91,6 @@ D-104 e D-105 implementadas aqui; o PR #1 (Fase B) foi integrado em `008e30c` e 
 - O evento `expense_updated` passou a levar `version`, porque reaproveita o payload do `PATCH` (aditivo).
 
 ### Encontrado na prontidão para deploy (15/10, não aprovado, não feito)
-- Prisma 5.22 não lista Node 22 nem 24 como suportados (Node 22 oficial só a partir do Prisma 6.0.0); a imagem segue em Node 24.
 - Integração: o teste de 5 edições concorrentes falha também na `main`; investigar pool/`maxWait` à parte.
 
 ### Backlog
@@ -138,7 +137,7 @@ D-105: instrução direta do usuário (sem registro anterior nos repositórios):
 D-106 (A): migrations na inicialização da imagem. D-107 (B): `trustProxy` por contagem de saltos; aprovada, mas inviável no
 Fastify 5.12.5; a escolha volta como D-108.
 
-### 2026-10-15 (D-108…D-111)
+### 2026-10-15 (D-108…D-112)
 D-108: contagem de saltos (`TRUST_PROXY_HOPS`) por função de confiança; a versão por faixas (A) foi trocada antes do commit.
   Evidência: `node_modules/fastify/lib/request.js`, `getTrustProxyFn` (l. 51-54): número devolve `() => false` ("Hop-count-only
   trust cannot validate the immediate peer. Fail closed..."). Premissa: no Container Apps o vizinho imediato é sempre o ingress e
@@ -147,6 +146,8 @@ D-109: `tini` como PID 1 e `docker-entrypoint.sh` com `exec node`, sem npm como 
 D-110: front na Vercel com rewrite `/api/*` → API; Socket.IO direto na Azure, autenticado por token (D-60). Cookie de refresh
   com `SameSite=Lax` também em produção (first-party pelo rewrite), substituindo a D-59.
 D-111 (A; apresentada como D-110, renumerada porque a D-110 ficou para o rewrite da Vercel): volume Redis de dev recriado (o dump da 8.10, RDB 15, não abre na 7.4; só cache) e contêiner órfão `migrate` removido.
+D-112: Node 24 + Prisma 5.22, combinação sem suporte oficial (o Prisma 5 só lista até o Node 20, que está em EOL; o Node 22
+  só é oficial a partir do Prisma 6.0.0). Testada e funcional na imagem; upgrade para o Prisma 6 planejado após o primeiro deploy.
 
 ---
 
