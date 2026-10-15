@@ -1,6 +1,7 @@
-import { createServer, request } from 'node:http'
+import { request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
+import fastify from 'fastify'
 import { sign } from 'jsonwebtoken'
 import { io as connect, Socket as ClientSocket } from 'socket.io-client'
 import type { Server as SocketServer } from 'socket.io'
@@ -8,6 +9,8 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { createSocketServer } from '../../infra/websocket/socket-server'
 import { io as globalIo } from '../../infra/websocket/io'
 import { env } from '../../infra/env'
+import { logger } from '../../infra/logger/logger'
+import { closeRedisConnection } from '../../infra/redis/redis-client'
 
 const redisClients = vi.hoisted(() => [] as object[])
 const memberships = vi.hoisted(() => new Set<string>())
@@ -18,6 +21,7 @@ vi.mock('../../infra/redis/redis-client', () => ({
         redisClients.push(client)
         return client
     },
+    closeRedisConnection: vi.fn(async () => {}),
 }))
 
 // O adapter Redis vira o adapter em memória que o próprio socket.io usa por padrão: as rooms
@@ -39,6 +43,11 @@ const MEMBER_ID = 'user-member'
 const OUTSIDER_ID = 'user-outsider'
 const GROUP_ID = 'group-1'
 
+// Mesmo logger do app real: o createSocketServer recebe a instância Fastify para registrar os hooks de fechamento.
+const createApp = () => fastify({ loggerInstance: logger })
+
+let app: ReturnType<typeof createApp>
+let appClosed = false
 let ioServer: SocketServer
 let url: string
 const clients: ClientSocket[] = []
@@ -65,10 +74,10 @@ async function joinedAs(userId: string) {
 
 beforeAll(async () => {
     memberships.add(`${MEMBER_ID}:${GROUP_ID}`)
-    const httpServer = createServer()
-    ioServer = createSocketServer(httpServer)
-    await new Promise<void>(resolve => httpServer.listen(0, '127.0.0.1', resolve))
-    url = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`
+    app = createApp()
+    ioServer = createSocketServer(app)
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`
 })
 
 afterEach(() => {
@@ -76,7 +85,7 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-    await new Promise(resolve => ioServer.close(resolve))
+    if (!appClosed) await app.close()
 })
 
 describe('Handshake autenticado', () => {
@@ -161,5 +170,20 @@ describe('Montagem do servidor', () => {
         })
 
         expect(header).toBe(allowed ? origin : undefined)
+    })
+})
+
+// Por último: fecha o app de verdade.
+describe('Encerramento pelos hooks do Fastify', () => {
+    it('desconecta os sockets locais no app.close() e depois fecha os clients de pub e sub', async () => {
+        const client = await joinedAs(MEMBER_ID)
+        const reason = next<string>(client, 'disconnect')
+
+        await app.close()
+        appClosed = true
+
+        expect(await reason).toBe('io server disconnect')
+        expect(closeRedisConnection).toHaveBeenCalledWith(redisClients[0])
+        expect(closeRedisConnection).toHaveBeenCalledWith(redisClients[1])
     })
 })

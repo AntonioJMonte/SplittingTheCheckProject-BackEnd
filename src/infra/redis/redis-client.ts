@@ -35,3 +35,19 @@ export function createRedisClient(): Redis {
     // espera o Redis voltar. O cache segue com a política oposta, falhando rápido (D-37).
     return withErrorLogging(new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }), 'pubsub')
 }
+
+// QUIT espera as respostas pendentes, mas só serve com a conexão de pé: fora dela, o QUIT entraria na fila do
+// pub/sub (sem teto de retries, D-62) e o encerramento esperaria o Redis voltar.
+export async function closeRedisConnection(client: Redis): Promise<void> {
+    if (client.status === 'ready') {
+        await client.quit()
+        return
+    }
+    client.disconnect()
+}
+
+export async function closeRedisClient(): Promise<void> {
+    const client = _client
+    _client = undefined
+    if (client) await closeRedisConnection(client)
+}

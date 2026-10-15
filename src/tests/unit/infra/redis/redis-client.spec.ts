@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
+import type Redis from 'ioredis'
 
 class FakeRedis extends EventEmitter {
+    status = 'ready'
+    quit = vi.fn(async () => 'OK')
+    disconnect = vi.fn()
+
     constructor(
         readonly url: string,
         readonly options?: Record<string, unknown>,
@@ -83,5 +88,58 @@ describe('redis-client (D-61)', () => {
 
         expect(getRedisClient()).toBe(getRedisClient())
         expect(createRedisClient()).not.toBe(createRedisClient())
+    })
+})
+
+describe('fechamento dos clientes no encerramento', () => {
+    beforeEach(() => {
+        built = []
+        logged = []
+    })
+
+    afterEach(() => {
+        vi.resetModules()
+    })
+
+    it('manda QUIT quando a conexão está pronta, para não perder resposta pendente', async () => {
+        const { closeRedisConnection, createRedisClient } = await loadModule()
+        const client = createRedisClient() as unknown as FakeRedis
+
+        await closeRedisConnection(client as unknown as Redis)
+
+        expect(client.quit).toHaveBeenCalledOnce()
+        expect(client.disconnect).not.toHaveBeenCalled()
+    })
+
+    it.each(['connecting', 'reconnecting', 'wait', 'end'])(
+        'só derruba a conexão quando ela está %s, porque um QUIT na fila esperaria o Redis voltar',
+        async status => {
+            const { closeRedisConnection, createRedisClient } = await loadModule()
+            const client = createRedisClient() as unknown as FakeRedis
+            client.status = status
+
+            await closeRedisConnection(client as unknown as Redis)
+
+            expect(client.disconnect).toHaveBeenCalledOnce()
+            expect(client.quit).not.toHaveBeenCalled()
+        },
+    )
+
+    it('não cria um cliente de cache só para fechá-lo', async () => {
+        const { closeRedisClient } = await loadModule()
+
+        await closeRedisClient()
+
+        expect(built).toHaveLength(0)
+    })
+
+    it('fecha o cliente de cache e deixa o próximo uso criar outro', async () => {
+        const { closeRedisClient, getRedisClient } = await loadModule()
+        const first = getRedisClient() as unknown as FakeRedis
+
+        await closeRedisClient()
+
+        expect(first.quit).toHaveBeenCalledOnce()
+        expect(getRedisClient()).not.toBe(first)
     })
 })
